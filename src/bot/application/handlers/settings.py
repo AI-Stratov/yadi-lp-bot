@@ -3,158 +3,23 @@ from datetime import time
 from aiogram import Router, F, types
 from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
-from aiogram.types import InlineKeyboardButton
-from aiogram.utils.keyboard import InlineKeyboardBuilder
 from dishka import FromDishka
 from dishka.integrations.aiogram import inject
 
-from bot.application.widgets.time_picker import (
-    build_time_keyboard,
-    handle_time_callback,
+from bot.application.widgets.time_picker import TimePicker
+from bot.application.widgets.keyboards import (
+    build_notification_modes_kb,
+    build_notification_settings_kb,
+    build_subjects_selection_kb,
 )
-from bot.domain.entities.mappings import SUBJECTS, NotificationScheduleMode, iter_subjects_for_course
+from bot.domain.entities.constants import SUBJECTS_PAGE_SIZE
+from bot.domain.entities.mappings import iter_subjects_for_course, NotificationScheduleMode
 from bot.domain.entities.states import NotificationSettingsStates
-from bot.domain.entities.user import UpdateUserEntity, UserEntity
+from bot.domain.entities.user import UpdateUserEntity
 from bot.domain.services.user import UserServiceInterface
+from bot.common.utils.formatting import time_to_str, str_to_time
 
 router = Router(name="notification_settings")
-
-
-def _fmt_time(t: time | None) -> str:
-    return t.strftime("%H:%M") if t else ""
-
-
-def _time_to_str(t: time) -> str:
-    return t.strftime("%H:%M")
-
-
-def _str_to_time(s: str | None, default: time) -> time:
-    if not s:
-        return default
-    try:
-        hh, mm = s.split(":")
-        return time(int(hh), int(mm))
-    except Exception:
-        return default
-
-
-def _mode_label(user: UserEntity) -> str:
-    mode = user.notification_mode
-    if mode == NotificationScheduleMode.ASAP:
-        return "⚡ Режим: сразу"
-    if mode == NotificationScheduleMode.AT_TIME:
-        return "⏰ Режим: время"
-    if mode == NotificationScheduleMode.IN_WINDOW:
-        return "🪟 Режим: промежуток"
-    return "⚙️ Режим: выбрать"
-
-
-def build_modes_kb(current: NotificationScheduleMode | None) -> types.InlineKeyboardMarkup:
-    """Клавиатура выбора режима доставки уведомлений."""
-    kb = InlineKeyboardBuilder()
-
-    def mark(mode: NotificationScheduleMode) -> str:
-        return "✅ " if current == mode else ""
-
-    kb.row(
-        InlineKeyboardButton(text=f"{mark(NotificationScheduleMode.ASAP)}⚡ Сразу", callback_data="mode:ASAP"),
-    )
-    kb.row(
-        InlineKeyboardButton(text=f"{mark(NotificationScheduleMode.AT_TIME)}⏰ В определённое время", callback_data="mode:AT_TIME"),
-    )
-    kb.row(
-        InlineKeyboardButton(text=f"{mark(NotificationScheduleMode.IN_WINDOW)}🪟 В промежутке", callback_data="mode:IN_WINDOW"),
-    )
-    kb.row(
-        InlineKeyboardButton(text="⬅️ Назад", callback_data="back_to_menu"),
-    )
-    kb.adjust(1)
-    return kb.as_markup()
-
-
-def build_settings_kb(user: UserEntity) -> types.InlineKeyboardMarkup:
-    """Главное меню настроек уведомлений."""
-    kb = InlineKeyboardBuilder()
-
-    # Переключатель уведомлений
-    notif_mark = "🟢 Вкл" if user.enable_notifications else "🔴 Выкл"
-    kb.row(InlineKeyboardButton(text=f"🔔 Уведомления: {notif_mark}", callback_data="toggle_notifications"))
-
-    # Режим доставки
-    kb.row(InlineKeyboardButton(text=f"{_mode_label(user)}", callback_data="choose_mode"))
-
-    # Дополнительные настройки по выбранному режиму
-    if user.notification_mode == NotificationScheduleMode.AT_TIME:
-        t = _fmt_time(user.task_send_time) or "-"
-        kb.row(InlineKeyboardButton(text=f"⏰ Время: {t}", callback_data="set_time"))
-    elif user.notification_mode == NotificationScheduleMode.IN_WINDOW:
-        s = _fmt_time(user.delivery_window_start) or "-"
-        e = _fmt_time(user.delivery_window_end) or "-"
-        kb.row(InlineKeyboardButton(text=f"🪟 Окно: {s}–{e}", callback_data="set_window"))
-
-    # Предметы: показываем количество активных (всего по курсу минус исключённые)
-    subjects_label = "📚 Предметы"
-    try:
-        if user.user_course:
-            total = len([key for key, _ in iter_subjects_for_course(user.user_course)])
-            excluded_cnt = len(user.excluded_disciplines or set())
-            active_cnt = max(total - excluded_cnt, 0)
-            subjects_label = f"📚 Предметы ({active_cnt})"
-    except Exception:
-        # в случае любой ошибки - не ломаем меню, показываем базовую надпись
-        pass
-
-    kb.row(InlineKeyboardButton(text=subjects_label, callback_data="subjects"))
-
-    kb.adjust(1)
-    return kb.as_markup()
-
-
-def _build_subjects_keyboard(*, subject_keys: list[str], excluded_keys: set[str], page: int) -> types.InlineKeyboardMarkup:
-    """Пагинированная клавиатура для выбора исключаемых предметов.
-    subject_keys - список ключей (папок на диске), excluded_keys - текущие исключённые.
-    Зеленая точка - предмет включён; красная - исключён.
-    """
-    page_size = SUBJECTS_PAGE_SIZE
-    start_idx = page * page_size
-    end_idx = start_idx + page_size
-    page_keys = subject_keys[start_idx:end_idx]
-
-    kb = InlineKeyboardBuilder()
-
-    # Кнопки по 2 в строке
-    for i in range(0, len(page_keys), 2):
-        row = []
-        for key in page_keys[i: i + 2]:
-            display = SUBJECTS.get(key, key)
-            is_excluded = key in excluded_keys
-            mark = "🔴" if is_excluded else "🟢"
-            row.append(
-                InlineKeyboardButton(
-                    text=f"{mark} {display}",
-                    callback_data=f"subj_toggle:{key}",
-                )
-            )
-        kb.row(*row)
-
-    # Навигация
-    has_prev = page > 0
-    has_next = end_idx < len(subject_keys)
-    nav = []
-    if has_prev:
-        nav.append(InlineKeyboardButton(text="⬅️ Предыдущая", callback_data=f"subj_page:{page - 1}"))
-    if has_next:
-        nav.append(InlineKeyboardButton(text="Следующая ➡️", callback_data=f"subj_page:{page + 1}"))
-    if nav:
-        kb.row(*nav)
-
-    # Действия
-    kb.row(
-        InlineKeyboardButton(text="✅ Готово", callback_data="subj_done"),
-        InlineKeyboardButton(text="❌ Отмена", callback_data="subj_cancel"),
-    )
-
-    return kb.as_markup()
 
 
 @router.message(Command("settings"))
@@ -164,12 +29,13 @@ async def open_settings(
     state: FSMContext,
     user_service: FromDishka[UserServiceInterface],
 ):
+    """Открыть меню настроек уведомлений."""
     await state.clear()
     from bot.domain.entities.user import CreateUserEntity
 
     user = await user_service.get_or_create(CreateUserEntity.from_aiogram(message.from_user))
 
-    await message.answer("⚙️ Настройки уведомлений", reply_markup=build_settings_kb(user))
+    await message.answer("⚙️ Настройки уведомлений", reply_markup=build_notification_settings_kb(user))
     await state.set_state(NotificationSettingsStates.menu)
 
 
@@ -188,7 +54,7 @@ async def toggle_notifications(
     update = UpdateUserEntity(enable_notifications=not user.enable_notifications)
     user = await user_service.update_user(callback.from_user.id, update)
 
-    await callback.message.edit_reply_markup(reply_markup=build_settings_kb(user))
+    await callback.message.edit_reply_markup(reply_markup=build_notification_settings_kb(user))
 
 
 @router.callback_query(NotificationSettingsStates.menu, F.data == "choose_mode")
@@ -204,7 +70,7 @@ async def choose_mode(
         return
     await callback.message.edit_text(
         "В какое время приходят уведомления?",
-        reply_markup=build_modes_kb(user.notification_mode),
+        reply_markup=build_notification_modes_kb(user.notification_mode),
     )
     await state.set_state(NotificationSettingsStates.choosing_mode)
 
@@ -233,7 +99,7 @@ async def set_mode(
 
     await callback.message.edit_text(
         "⚙️ Настройки уведомлений",
-        reply_markup=build_settings_kb(user),
+        reply_markup=build_notification_settings_kb(user),
     )
     await state.set_state(NotificationSettingsStates.menu)
 
@@ -251,7 +117,7 @@ async def back_to_menu_from_mode(
         return
     await callback.message.edit_text(
         "⚙️ Настройки уведомлений",
-        reply_markup=build_settings_kb(user),
+        reply_markup=build_notification_settings_kb(user),
     )
     await state.set_state(NotificationSettingsStates.menu)
 
@@ -262,6 +128,7 @@ async def start_pick_time(
     callback: types.CallbackQuery,
     state: FSMContext,
     user_service: FromDishka[UserServiceInterface],
+    time_picker: FromDishka[TimePicker],
 ):
     await callback.answer()
     user = await user_service.get_user_by_id(callback.from_user.id)
@@ -270,16 +137,16 @@ async def start_pick_time(
     if not user or user.notification_mode != NotificationScheduleMode.AT_TIME:
         await callback.message.edit_text(
             "В какое время приходят уведомления?",
-            reply_markup=build_modes_kb(user.notification_mode if user else None),
+            reply_markup=build_notification_modes_kb(user.notification_mode if user else None),
         )
         await state.set_state(NotificationSettingsStates.choosing_mode)
         return
 
     current_time_obj = user.task_send_time if user.task_send_time else time(10, 0)
-    await state.update_data(current_time=_time_to_str(current_time_obj))
+    await state.update_data(current_time=time_to_str(current_time_obj))
     await callback.message.edit_text(
         "⏰ Выбор времени",
-        reply_markup=build_time_keyboard(current_time_obj, prefix="tp"),
+        reply_markup=time_picker.build_keyboard(current_time_obj),
     )
     await state.set_state(NotificationSettingsStates.picking_time)
 
@@ -290,42 +157,29 @@ async def handle_time_picker(
     callback: types.CallbackQuery,
     state: FSMContext,
     user_service: FromDishka[UserServiceInterface],
+    time_picker: FromDishka[TimePicker],
 ):
     data = await state.get_data()
-    cur = _str_to_time(data.get("current_time"), default=time(10, 0))
+    cur = str_to_time(data.get("current_time"), default=time(10, 0))
 
-    cur, action = handle_time_callback(callback.data, cur, prefix="tp")
+    cur, action = time_picker.handle_callback(callback.data, cur)
 
     if action == "update":
-        await state.update_data(current_time=_time_to_str(cur))
-        await callback.message.edit_text(
-            "⏰ Выбор времени",
-            reply_markup=build_time_keyboard(cur, prefix="tp"),
-        )
+        await state.update_data(current_time=time_to_str(cur))
+        await callback.message.edit_reply_markup(reply_markup=time_picker.build_keyboard(cur))
         await callback.answer()
-        return
-    if action == "confirm":
-        update = UpdateUserEntity(task_send_time=cur, notification_mode=NotificationScheduleMode.AT_TIME)
+    elif action == "confirm":
+        update = UpdateUserEntity(task_send_time=cur)
         user = await user_service.update_user(callback.from_user.id, update)
+        await callback.message.edit_text("⚙️ Настройки уведомлений", reply_markup=build_notification_settings_kb(user))
         await state.set_state(NotificationSettingsStates.menu)
-        await state.set_data({})
-        await callback.message.edit_text(
-            "⚙️ Настройки уведомлений",
-            reply_markup=build_settings_kb(user),
-        )
-        await callback.answer("Время обновлено")
-        return
-    if action == "cancel":
-        await state.set_state(NotificationSettingsStates.menu)
-        await state.set_data({})
+        await callback.answer()
+    elif action == "cancel":
         user = await user_service.get_user_by_id(callback.from_user.id)
         if user:
-            await callback.message.edit_text(
-                "⚙️ Настройки уведомлений",
-                reply_markup=build_settings_kb(user),
-            )
-        await callback.answer("Отменено")
-        return
+            await callback.message.edit_text("⚙️ Настройки уведомлений", reply_markup=build_notification_settings_kb(user))
+        await state.set_state(NotificationSettingsStates.menu)
+        await callback.answer()
 
 
 @router.callback_query(NotificationSettingsStates.menu, F.data == "set_window")
@@ -334,6 +188,7 @@ async def start_pick_window_start(
     callback: types.CallbackQuery,
     state: FSMContext,
     user_service: FromDishka[UserServiceInterface],
+    time_picker: FromDishka[TimePicker],
 ):
     await callback.answer()
     user = await user_service.get_user_by_id(callback.from_user.id)
@@ -342,7 +197,7 @@ async def start_pick_window_start(
     if not user or user.notification_mode != NotificationScheduleMode.IN_WINDOW:
         await callback.message.edit_text(
             "В какое время приходят уведомления?",
-            reply_markup=build_modes_kb(user.notification_mode if user else None),
+            reply_markup=build_notification_modes_kb(user.notification_mode if user else None),
         )
         await state.set_state(NotificationSettingsStates.choosing_mode)
         return
@@ -350,12 +205,12 @@ async def start_pick_window_start(
     start_obj = user.delivery_window_start if user.delivery_window_start else time(10, 0)
     end_prev_obj = user.delivery_window_end if user.delivery_window_end else None
     await state.update_data(
-        window_start=_time_to_str(start_obj),
-        window_end_prev=_time_to_str(end_prev_obj) if end_prev_obj else None,
+        window_start=time_to_str(start_obj),
+        window_end_prev=time_to_str(end_prev_obj) if end_prev_obj else None,
     )
     await callback.message.edit_text(
         "🪟 Начало промежутка",
-        reply_markup=build_time_keyboard(start_obj, prefix="tp"),
+        reply_markup=time_picker.build_keyboard(start_obj),
     )
     await state.set_state(NotificationSettingsStates.picking_window_start)
 
@@ -366,39 +221,38 @@ async def handle_window_start(
     callback: types.CallbackQuery,
     state: FSMContext,
     user_service: FromDishka[UserServiceInterface],
+    time_picker: FromDishka[TimePicker],
 ):
     data = await state.get_data()
-    cur = _str_to_time(data.get("window_start"), default=time(10, 0))
+    cur = str_to_time(data.get("window_start"), default=time(10, 0))
 
-    cur, action = handle_time_callback(callback.data, cur, prefix="tp")
+    cur, action = time_picker.handle_callback(callback.data, cur)
 
     if action == "update":
-        await state.update_data(window_start=_time_to_str(cur))
+        await state.update_data(window_start=time_to_str(cur))
         await callback.message.edit_text(
             "🪟 Начало промежутка",
-            reply_markup=build_time_keyboard(cur, prefix="tp"),
+            reply_markup=time_picker.build_keyboard(cur),
         )
         await callback.answer()
-        return
-    if action == "confirm":
-        prev_end = _str_to_time((await state.get_data()).get("window_end_prev"), default=time((cur.hour + 1) % 24, cur.minute))
+    elif action == "confirm":
+        prev_end = str_to_time((await state.get_data()).get("window_end_prev"), default=time((cur.hour + 1) % 24, cur.minute))
         end_initial = prev_end
-        await state.update_data(window_start=_time_to_str(cur), current_time=_time_to_str(end_initial))
+        await state.update_data(window_start=time_to_str(cur), current_time=time_to_str(end_initial))
         await callback.message.edit_text(
             "🪟 Конец промежутка",
-            reply_markup=build_time_keyboard(end_initial, prefix="tp"),
+            reply_markup=time_picker.build_keyboard(end_initial),
         )
         await state.set_state(NotificationSettingsStates.picking_window_end)
         await callback.answer()
-        return
-    if action == "cancel":
+    elif action == "cancel":
         await state.set_state(NotificationSettingsStates.menu)
         await state.set_data({})
         user = await user_service.get_user_by_id(callback.from_user.id)
         if user:
             await callback.message.edit_text(
                 "⚙️ Настройки уведомлений",
-                reply_markup=build_settings_kb(user),
+                reply_markup=build_notification_settings_kb(user),
             )
         await callback.answer("Отменено")
         return
@@ -410,22 +264,22 @@ async def handle_window_end(
     callback: types.CallbackQuery,
     state: FSMContext,
     user_service: FromDishka[UserServiceInterface],
+    time_picker: FromDishka[TimePicker],
 ):
     data = await state.get_data()
-    cur = _str_to_time(data.get("current_time"), default=time(11, 0))
+    cur = str_to_time(data.get("current_time"), default=time(11, 0))
 
-    cur, action = handle_time_callback(callback.data, cur, prefix="tp")
+    cur, action = time_picker.handle_callback(callback.data, cur)
 
     if action == "update":
-        await state.update_data(current_time=_time_to_str(cur))
+        await state.update_data(current_time=time_to_str(cur))
         await callback.message.edit_text(
             "🪟 Конец промежутка",
-            reply_markup=build_time_keyboard(cur, prefix="tp"),
+            reply_markup=time_picker.build_keyboard(cur),
         )
         await callback.answer()
-        return
-    if action == "confirm":
-        start_t = _str_to_time((await state.get_data()).get("window_start"), default=time(10, 0))
+    elif action == "confirm":
+        start_t = str_to_time((await state.get_data()).get("window_start"), default=time(10, 0))
         update = UpdateUserEntity(
             delivery_window_start=start_t,
             delivery_window_end=cur,
@@ -436,27 +290,23 @@ async def handle_window_end(
         await state.set_data({})
         await callback.message.edit_text(
             "⚙️ Настройки уведомлений",
-            reply_markup=build_settings_kb(user),
+            reply_markup=build_notification_settings_kb(user),
         )
         await callback.answer("Промежуток обновлён")
-        return
-    if action == "cancel":
+    elif action == "cancel":
         await state.set_state(NotificationSettingsStates.menu)
         await state.set_data({})
         user = await user_service.get_user_by_id(callback.from_user.id)
         if user:
             await callback.message.edit_text(
                 "⚙️ Настройки уведомлений",
-                reply_markup=build_settings_kb(user),
+                reply_markup=build_notification_settings_kb(user),
             )
         await callback.answer("Отменено")
         return
 
 
 # -------- Предметы: выбор/пагинация/подтверждение --------
-
-SUBJECTS_PAGE_SIZE = 10
-
 
 @router.callback_query(NotificationSettingsStates.menu, F.data == "subjects")
 @inject
@@ -470,7 +320,7 @@ async def subjects_open(
     if not user or not user.user_course:
         await callback.message.edit_text(
             "Сначала выберите курс через /set",
-            reply_markup=build_settings_kb(user) if user else None,
+            reply_markup=build_notification_settings_kb(user) if user else None,
         )
         return
 
@@ -486,12 +336,18 @@ async def subjects_open(
         "subj_page": 0,
     })
 
-    kb = _build_subjects_keyboard(subject_keys=subj_keys, excluded_keys=excluded_current, page=0)
+    kb = build_subjects_selection_kb(
+        subject_keys=subj_keys,
+        excluded_keys=excluded_current,
+        page=0,
+        page_size=SUBJECTS_PAGE_SIZE
+    )
     await callback.message.edit_text("📚 Исключить предметы", reply_markup=kb)
 
 
 @router.callback_query(NotificationSettingsStates.picking_subjects, F.data.startswith("subj_toggle:"))
 async def subjects_toggle(callback: types.CallbackQuery, state: FSMContext):
+    """Обратная совместимость: старый формат subj_toggle:{key}."""
     await callback.answer()
     data = await state.get_data()
     key = callback.data.split(":", 1)[1]
@@ -503,12 +359,55 @@ async def subjects_toggle(callback: types.CallbackQuery, state: FSMContext):
     if key in excluded:
         excluded.remove(key)
     else:
+        if key in subj_keys:
+            excluded.add(key)
+        else:
+            return
+
+    page = int(data.get("subj_page", 0))
+
+    await state.update_data(subj_excluded=list(excluded))
+    kb = build_subjects_selection_kb(
+        subject_keys=subj_keys,
+        excluded_keys=excluded,
+        page=page,
+        page_size=SUBJECTS_PAGE_SIZE
+    )
+    await callback.message.edit_reply_markup(reply_markup=kb)
+
+
+@router.callback_query(NotificationSettingsStates.picking_subjects, F.data.startswith("subj_ti:"))
+async def subjects_toggle_index(callback: types.CallbackQuery, state: FSMContext):
+    """Новый формат: subj_ti:{index} — короткий callback_data для Telegram."""
+    await callback.answer()
+    data = await state.get_data()
+    try:
+        idx = int(callback.data.split(":", 1)[1])
+    except Exception:
+        return
+
+    subj_keys: list[str] = data.get("subj_all_keys", [])
+    if not (0 <= idx < len(subj_keys)):
+        return
+    key = subj_keys[idx]
+
+    excluded_list: list[str] = data.get("subj_excluded", [])
+    excluded = set(excluded_list)
+
+    if key in excluded:
+        excluded.remove(key)
+    else:
         excluded.add(key)
 
     page = int(data.get("subj_page", 0))
 
     await state.update_data(subj_excluded=list(excluded))
-    kb = _build_subjects_keyboard(subject_keys=subj_keys, excluded_keys=excluded, page=page)
+    kb = build_subjects_selection_kb(
+        subject_keys=subj_keys,
+        excluded_keys=excluded,
+        page=page,
+        page_size=SUBJECTS_PAGE_SIZE
+    )
     await callback.message.edit_reply_markup(reply_markup=kb)
 
 
@@ -516,13 +415,21 @@ async def subjects_toggle(callback: types.CallbackQuery, state: FSMContext):
 async def subjects_page(callback: types.CallbackQuery, state: FSMContext):
     await callback.answer()
     data = await state.get_data()
-    page = int(callback.data.split(":", 1)[1])
+    try:
+        page = int(callback.data.split(":", 1)[1])
+    except Exception:
+        page = 0
     subj_keys: list[str] = data.get("subj_all_keys", [])
     excluded_list: list[str] = data.get("subj_excluded", [])
     excluded = set(excluded_list)
 
     await state.update_data(subj_page=page)
-    kb = _build_subjects_keyboard(subject_keys=subj_keys, excluded_keys=excluded, page=page)
+    kb = build_subjects_selection_kb(
+        subject_keys=subj_keys,
+        excluded_keys=excluded,
+        page=page,
+        page_size=SUBJECTS_PAGE_SIZE
+    )
     await callback.message.edit_reply_markup(reply_markup=kb)
 
 
@@ -538,7 +445,7 @@ async def subjects_cancel(
     await state.set_data({})
     user = await user_service.get_user_by_id(callback.from_user.id)
     if user:
-        await callback.message.edit_text("⚙️ Настройки уведомлений", reply_markup=build_settings_kb(user))
+        await callback.message.edit_text("⚙️ Настройки уведомлений", reply_markup=build_notification_settings_kb(user))
 
 
 @router.callback_query(NotificationSettingsStates.picking_subjects, F.data == "subj_done")
@@ -560,5 +467,5 @@ async def subjects_done(
     await state.set_state(NotificationSettingsStates.menu)
     await state.set_data({})
 
-    await callback.message.edit_text("⚙️ Настройки уведомлений", reply_markup=build_settings_kb(user))
+    await callback.message.edit_text("⚙️ Настройки уведомлений", reply_markup=build_notification_settings_kb(user))
     await callback.answer("Предметы обновлены")

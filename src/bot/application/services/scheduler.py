@@ -5,24 +5,33 @@ from aiogram import Bot
 from aiogram.types import LinkPreviewOptions
 
 from bot.common.logs import logger
+from bot.common.utils.formatting import format_notification_message
 from bot.domain.entities.notification import UserNotification
 from bot.domain.repositories.notification import NotificationRepositoryInterface
+from bot.domain.services.scheduler import SchedulerServiceInterface
 
 
-class NotificationScheduler:
-    """Планировщик отправки уведомлений по расписанию"""
+class NotificationScheduler(SchedulerServiceInterface):
+    """
+    Планировщик отправки уведомлений по расписанию
+    """
 
     def __init__(
         self,
         bot: Bot,
         repository: NotificationRepositoryInterface,
-        check_interval: int = 60,  # Проверка каждую минуту
+        check_interval: int = 60,
     ):
         self.bot = bot
         self.repository = repository
-        self.check_interval = check_interval
+        self._check_interval = check_interval
         self._running = False
         self._task = None
+
+    @property
+    def check_interval(self) -> int:
+        """Периодичность проверки очереди (в секундах)."""
+        return self._check_interval
 
     async def start(self):
         """Запускает планировщик"""
@@ -61,7 +70,7 @@ class NotificationScheduler:
 
         logger.debug(f"🔍 Проверка уведомлений до {now.isoformat()}")
 
-        async for notification in self.repository.get_due_notifications(now):
+        async for notification in await self.repository.get_due_notifications(now):
             try:
                 await self._send_notification(notification)
                 if notification.notification_id:
@@ -76,12 +85,12 @@ class NotificationScheduler:
         if sent_count > 0 or failed_count > 0:
             logger.info(f"📤 Отправлено уведомлений: {sent_count}, ошибок: {failed_count}")
         else:
-            logger.debug(f"⏭️ Нет уведомлений для отправки")
+            logger.debug("⏭️ Нет уведомлений для отправки")
 
     async def _send_notification(self, notification: UserNotification):
         """Отправляет одно уведомление пользователю"""
         task = notification.task
-        message = self._format_message(task)
+        message = format_notification_message(task)
 
         await self.bot.send_message(
             chat_id=notification.user_id,
@@ -89,69 +98,3 @@ class NotificationScheduler:
             parse_mode="HTML",
             link_preview_options=LinkPreviewOptions(is_disabled=True),
         )
-
-    def _format_message(self, task) -> str:
-        """Форматирует сообщение для отправки"""
-        from bot.domain.entities.mappings import SUBJECTS
-
-        # Отображаемое имя предмета
-        subject_display = SUBJECTS.get(task.subject_code, task.subject_code) if task.subject_code else "Неизвестно"
-
-        # Дата/время занятия
-        lesson_date_str = ""
-        if task.lesson_date:
-            lesson_date_str = task.lesson_date.strftime('%d.%m %H:%M')
-
-        # Преподаватель
-        teacher = task.teacher or ""
-
-        # Хэштеги
-        def sanitize_tag(value: str) -> str:
-            # Превращаем строку в #хэштег: пробелы/точки в подчёркивания, убираем лишнее
-            import re
-            tag = re.sub(r"[\s\.]+", "_", value.strip())
-            tag = re.sub(r"[^0-9A-Za-zА-Яа-яЁё_]+", "", tag)
-            tag = re.sub(r"_+", "_", tag).strip("_")
-            return tag
-
-        hashtags: list[str] = []
-        # Тема (лекция/семинар)
-        if getattr(task, "topic", None):
-            hashtags.append(f"#{sanitize_tag(task.topic.lower())}")
-        # Группа
-        if getattr(task, "study_group", None):
-            hashtags.append(f"#{sanitize_tag(task.study_group.value)}")
-        # Предмет (код - короче и удобнее)
-        if getattr(task, "subject_code", None):
-            hashtags.append(f"#{sanitize_tag(task.subject_code)}")
-        # Преподаватель (как доп. тег для поиска)
-        if teacher:
-            hashtags.append(f"#{sanitize_tag(teacher)}")
-
-        # Выбираем ссылку: download_url предпочтительнее, иначе public_url
-        link = task.download_url or task.public_url or ""
-
-        # Собираем сообщение
-        lines: list[str] = []
-        lines.append(f"📚 <b>{subject_display or 'Неизвестно'}</b>")
-        if lesson_date_str:
-            lines.append(f"📅 {lesson_date_str}")
-        if teacher:
-            lines.append(f"👨‍🏫 {teacher}")
-        if hashtags:
-            for h in hashtags:
-                # Разносим тегами по смыслу, но компактно - один тег в строке с соответствующим эмодзи
-                if h.startswith('#лекция') or h.startswith('#семинар'):
-                    lines.append(f"💼 {h}")
-                elif getattr(task, "study_group", None) and h.endswith(task.study_group.value):
-                    lines.append(f"👥 {h}")
-                elif getattr(task, "subject_code", None) and h.endswith(task.subject_code):
-                    lines.append(f"📖 {h}")
-                else:
-                    lines.append(f"🏷️ {h}")
-        if link:
-            lines.append(f"\n🔗 <a href='{link}'>Смотреть видео</a>")
-        else:
-            lines.append(f"\n📄 Файл: {task.file_name}")
-
-        return "\n".join(lines)

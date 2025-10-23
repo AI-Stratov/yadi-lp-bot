@@ -1,14 +1,22 @@
 import asyncio
 from datetime import datetime
 from hashlib import sha256
-from typing import Any, Optional
 import json
 
 import aiohttp
 from bot.common.logs import logger
 from bot.domain.entities.notification import NotificationTask
 from bot.domain.services.long_poll import LongPollServiceInterface
-from bot.domain.entities.mappings import StudyGroups, TOPICS
+from bot.common.utils.path_parser import (
+    parse_datetime,
+    build_public_file_url,
+    extract_subject_from_path,
+    extract_topic_from_path,
+    extract_group_from_path,
+    extract_group_raw_from_path,
+    extract_teacher_from_filename,
+    extract_date_from_filename,
+)
 
 
 class YandexDiskPollingService(LongPollServiceInterface):
@@ -46,7 +54,7 @@ class YandexDiskPollingService(LongPollServiceInterface):
         # Читаем чекпоинт - время последней проверки
         checkpoint_key = self._get_checkpoint_key()
         last_check = await self.redis.get(checkpoint_key)
-        last_check_dt = self._parse_datetime(last_check)
+        last_check_dt = parse_datetime(last_check)
 
         # Запоминаем время начала текущего обхода (без timezone)
         current_check_dt = datetime.now()
@@ -54,7 +62,7 @@ class YandexDiskPollingService(LongPollServiceInterface):
         if last_check_dt:
             logger.info(f"🕒 Последняя проверка: {last_check_dt.isoformat()}")
         else:
-            logger.info(f"🆕 Первый запуск, чекпоинта нет")
+            logger.info("🆕 Первый запуск, чекпоинта нет")
 
         # Собираем новые файлы и параллельно считаем статистику по группам
         new_tasks = []
@@ -62,14 +70,14 @@ class YandexDiskPollingService(LongPollServiceInterface):
         common_count = 0
 
         async for file_dict in self._fetch_all_files():
-            file_modified = self._parse_datetime(file_dict.get("modified"))
+            file_modified = parse_datetime(file_dict.get("modified"))
 
             # Подсчёт для статистики
             path = file_dict.get("path", "")
-            g = self._extract_group_from_path(path)
+            g = extract_group_from_path(path)
             if g:
-                name = g.value
-                group_counts[name] = group_counts.get(name, 0) + 1
+                group_name: str = str(g.value)
+                group_counts[group_name] = group_counts.get(group_name, 0) + 1
             else:
                 common_count += 1
 
@@ -90,7 +98,7 @@ class YandexDiskPollingService(LongPollServiceInterface):
         elif last_check_dt:
             # Даже если файлов нет, обновляем чекпоинт
             await self.redis.set(checkpoint_key, current_check_dt.isoformat())
-            logger.debug(f"⏭️ Новых файлов нет, чекпоинт обновлен")
+            logger.debug("⏭️ Новых файлов нет, чекпоинт обновлен")
 
         # Обновляем кэш статистики по группам (5 минут)
         try:
@@ -120,7 +128,7 @@ class YandexDiskPollingService(LongPollServiceInterface):
 
     async def _fetch_directory(self, path: str) -> list[dict]:
         """Запрашивает содержимое одной директории (с пагинацией)."""
-        all_items = []
+        all_items: list[dict] = []
         offset = 0
         limit = 200
 
@@ -145,6 +153,7 @@ class YandexDiskPollingService(LongPollServiceInterface):
                     if not items:
                         break
 
+                    # добавляем полученные элементы
                     all_items.extend(items)
 
                     # Если получили меньше чем limit, значит это последняя страница
@@ -164,17 +173,17 @@ class YandexDiskPollingService(LongPollServiceInterface):
         """Создаёт задачу на уведомление из данных файла."""
         path = file_dict.get("path", "")
         file_name = file_dict.get("name", "")
-        subject_code = self._extract_subject_from_path(path)
-        study_group = self._extract_group_from_path(path)
-        group_raw = self._extract_group_raw_from_path(path)
-        topic = self._extract_topic_from_path(path)
+        subject_code = extract_subject_from_path(path)
+        study_group = extract_group_from_path(path)
+        group_raw = extract_group_raw_from_path(path)
+        topic = extract_topic_from_path(path)
 
         # Формируем прямую ссылку на просмотр файла на Яндекс.Диске
-        public_url = self._build_public_file_url(path)
+        public_url = build_public_file_url(path, self.public_root_url)
 
         # Парсим метаданные из названия файла
-        teacher = self._extract_teacher_from_filename(file_name)
-        lesson_date = self._extract_date_from_filename(file_name) or self._parse_datetime(file_dict.get("modified"))
+        teacher = extract_teacher_from_filename(file_name)
+        lesson_date = extract_date_from_filename(file_name) or parse_datetime(file_dict.get("modified"))
 
         return NotificationTask(
             subject_code=subject_code,
@@ -192,133 +201,6 @@ class YandexDiskPollingService(LongPollServiceInterface):
             resource_id=file_dict.get("resource_id"),
             modified_iso=file_dict.get("modified"),
         )
-
-    def _build_public_file_url(self, file_path: str) -> str:
-        """Формирует прямую ссылку на файл на Яндекс.Диске"""
-        import urllib.parse
-
-        # Убираем ведущий слэш
-        clean_path = file_path.lstrip("/")
-
-        # Разделяем базовую ссылку и параметры
-        base_url = self.public_root_url.split('?')[0].rstrip('/')
-
-        # Формируем полный путь для параметра path
-        encoded_path = urllib.parse.quote(clean_path, safe="/")
-
-        # Возвращаем ссылку с параметром path
-        return f"{base_url}/{encoded_path}"
-
-    def _extract_subject_from_path(self, path: str) -> Optional[str]:
-        """Извлекает код предмета из пути (ищет в сегментах пути)."""
-        try:
-            from bot.domain.entities.mappings import SUBJECTS
-
-            # Разбиваем путь на сегменты и ищем известный предмет
-            segments = [s for s in path.replace("\\", "/").split("/") if s]
-            for segment in reversed(segments):
-                if segment in SUBJECTS:
-                    return segment
-        except Exception:
-            pass
-
-        return None
-
-    def _extract_topic_from_path(self, path: str) -> Optional[str]:
-        """Извлекает тему занятия (Лекция/Семинар) из сегментов пути."""
-        try:
-            segments = [s.strip() for s in path.replace("\\", "/").split("/") if s]
-            for segment in segments:
-                if segment in TOPICS:
-                    return segment
-        except Exception:
-            pass
-        return None
-
-    def _extract_group_from_path(self, path: str) -> Optional[StudyGroups]:
-        """Извлекает код учебной группы из пути, если присутствует соответствующая папка.
-        Например: '/1 курс/МА/БКНАД252/...' -> StudyGroups.BKNAD252
-        Лекции общие для курса обычно без папки группы: '/1 курс/ЛА/Лекция/...'
-        """
-        try:
-            segments = [s for s in path.replace("\\", "/").split("/") if s]
-            values = set(g.value for g in StudyGroups)
-            for segment in segments:
-                if segment in values:
-                    # Вернём enum по значению
-                    return StudyGroups(segment)
-        except Exception:
-            pass
-        return None
-
-    def _extract_group_raw_from_path(self, path: str) -> Optional[str]:
-        """Находит в пути сегмент, похожий на код группы (даже если неизвестен enum).
-        Паттерн: ^БКНАД\d{3}$
-        """
-        import re
-
-        segments = [s for s in path.replace("\\", "/").split("/") if s]
-        pattern = re.compile(r"^БКНАД\d{3}$", re.IGNORECASE)
-        for segment in segments:
-            if pattern.match(segment):
-                return segment
-        return None
-
-    def _extract_teacher_from_filename(self, filename: str) -> Optional[str]:
-        """Извлекает имя преподавателя из названия файла.
-        Формат: 'Фамилия И.О. 2025-10-15T08-08-19Z.mp4'
-        """
-        import re
-
-        # Паттерн: Фамилия И.О. (кириллица + точки)
-        # Примеры: "Лобода А.А.", "Медведь Н.Ю.", "Овчинников С.А."
-        pattern = r'^([А-ЯЁа-яё]+\s+[А-ЯЁ]\.[А-ЯЁ]\.)'
-        match = re.match(pattern, filename)
-
-        if match:
-            return match.group(1).strip()
-
-        return None
-
-    def _extract_date_from_filename(self, filename: str) -> Optional[datetime]:
-        """Извлекает дату занятия из названия файла.
-        Формат: '2025-10-15T08-08-19Z' или '2025-10-15'
-        """
-        import re
-
-        # Паттерн: ISO-подобная дата в названии
-        # Формат: YYYY-MM-DDTHH-MM-SSZ или YYYY-MM-DD
-        pattern = r'(\d{4})-(\d{2})-(\d{2})(?:T(\d{2})-(\d{2})-(\d{2})Z?)?'
-        match = re.search(pattern, filename)
-
-        if match:
-            year, month, day = int(match.group(1)), int(match.group(2)), int(match.group(3))
-            hour = int(match.group(4)) if match.group(4) else 0
-            minute = int(match.group(5)) if match.group(5) else 0
-            second = int(match.group(6)) if match.group(6) else 0
-
-            try:
-                return datetime(year, month, day, hour, minute, second)
-            except ValueError:
-                pass
-
-        return None
-
-    def _parse_datetime(self, value: Any) -> Optional[datetime]:
-        """Парсит datetime из строки или bytes (без timezone)."""
-        if not value:
-            return None
-
-        if isinstance(value, (bytes, bytearray)):
-            value = value.decode()
-
-        try:
-            # Убираем timezone из ISO формата
-            dt = datetime.fromisoformat(value.replace("Z", "+00:00"))
-            # Возвращаем naive datetime (без timezone)
-            return dt.replace(tzinfo=None)
-        except Exception:
-            return None
 
     def _get_checkpoint_key(self) -> str:
         """Генерирует ключ Redis для хранения чекпоинта."""

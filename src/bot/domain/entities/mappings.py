@@ -40,13 +40,6 @@ class NotificationStatus(StrEnum):
     FAILED = "failed"  # Ошибка отправки
 
 
-# COURSES = {
-#     "1": "1 курс",
-#     "2": "2 курс",
-#     "3": "3 курс",
-#     "4": "4 курс",
-# }
-
 SUBJECTS = {
     "БЖД": "БЖД",
     "ДМ": "Дискретная математика",
@@ -94,12 +87,22 @@ COURSE_SUBJECTS: dict[StudyCourses, list[str]] = {
 
 
 def get_subject_keys_for_course(course: StudyCourses) -> list[str]:
-    """Вернуть список ключей предметов (по умолчанию - из COURSE_SUBJECTS; если пусто, fallback на все SUBJECTS)."""
-    keys = COURSE_SUBJECTS.get(course) or []
-    if keys:
-        return keys
-    # Fallback: без настроек курса показываем все известные предметы
-    return list(SUBJECTS.keys())
+    """
+    Вернуть список ключей предметов для курса.
+
+    Args:
+        course: Код курса
+
+    Returns:
+        list[str]: Список ключей предметов
+
+    Raises:
+        ValueError: Если для курса не настроены предметы
+    """
+    keys = COURSE_SUBJECTS.get(course)
+    if not keys:
+        raise ValueError(f"Предметы для курса {course} не настроены")
+    return keys
 
 
 def iter_subjects_for_course(course: StudyCourses) -> Iterable[tuple[str, str]]:

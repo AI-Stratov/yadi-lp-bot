@@ -5,34 +5,30 @@ from aiogram.utils.keyboard import InlineKeyboardBuilder
 from dishka import FromDishka
 from dishka.integrations.aiogram import inject
 
+from bot.application.widgets.keyboards import build_roles_menu_kb
+from bot.common.utils.permissions import is_superuser
+from bot.common.utils.pagination import paginate
+from bot.common.utils.sorting import sort_users
+from bot.domain.entities.constants import PAGE_SIZE
 from bot.domain.entities.mappings import UserType
 from bot.domain.entities.user import CreateUserEntity
 from bot.domain.services.user import UserServiceInterface
 
 router = Router(name="roles")
 
-PAGE_SIZE = 10
-
-
-def _is_superuser(u) -> bool:
-    return getattr(u, "user_type", None) == UserType.SUPERUSER
-
-
-def _sort_users(users: list) -> list:
-    return sorted(users, key=lambda u: (u.display_name.lower(), u.tg_id))
-
-
-def _build_admins_menu_kb() -> InlineKeyboardMarkup:
-    kb = InlineKeyboardBuilder()
-    kb.row(
-        InlineKeyboardButton(text="👥 Пользователи", callback_data="roles:view:users:page:0"),
-        InlineKeyboardButton(text="🛡️ Администраторы", callback_data="roles:view:admins:page:0"),
-    )
-    kb.row(InlineKeyboardButton(text="📋 Все", callback_data="roles:view:all:page:0"))
-    return kb.as_markup()
-
 
 async def _build_role_list_page(user_service: UserServiceInterface, role_choice: str, page: int) -> tuple[str, InlineKeyboardMarkup]:
+    """
+    Построить страницу списка пользователей по роли.
+
+    Args:
+        user_service: Сервис пользователей
+        role_choice: Выбранная роль (users/admins)
+        page: Номер страницы
+
+    Returns:
+        tuple[str, InlineKeyboardMarkup]: Текст сообщения и клавиатура
+    """
     if role_choice == "users":
         role_type = UserType.USER
         header = "👥 Пользователи"
@@ -50,41 +46,37 @@ async def _build_role_list_page(user_service: UserServiceInterface, role_choice:
         new_role = UserType.ADMIN
 
     users = await user_service.get_users_by_type(role_type)
-    users = _sort_users(users)
+    users = sort_users(users)
 
-    total = len(users)
-    pages = max(1, (total + PAGE_SIZE - 1) // PAGE_SIZE)
-    page = max(0, min(page, pages - 1))
-    start = page * PAGE_SIZE
-    end = min(start + PAGE_SIZE, total)
+    pg = paginate(users, page, PAGE_SIZE)
 
     lines: list[str] = []
-    lines.append(f"{header} — страница {page + 1}/{pages}")
-    lines.append(f"Всего: {total}")
+    lines.append(f"{header} — страница {pg.page + 1}/{pg.total_pages}")
+    lines.append(f"Всего: {pg.total_items}")
     lines.append("")
 
     kb = InlineKeyboardBuilder()
 
-    if total == 0:
-        lines.append("Список пуст. Откройте вкладку ‘Все’, чтобы увидеть всех пользователей.")
+    if pg.total_items == 0:
+        lines.append("Список пуст. Откройте вкладку 'Все', чтобы увидеть всех пользователей.")
     else:
-        for u in users[start:end]:
+        for u in pg.items:
             name = u.display_name
             lines.append(f"• {name} (ID: {u.tg_id})")
             # Кнопка смены роли
             kb.row(
                 InlineKeyboardButton(
                     text=f"{action_label} — {name}",
-                    callback_data=f"roles:set:{u.tg_id}:{new_role.value}:{role_choice}:{page}",
+                    callback_data=f"roles:set:{u.tg_id}:{new_role.value}:{role_choice}:{pg.page}",
                 )
             )
 
     # Навигация
     nav_row = []
-    if page > 0:
-        nav_row.append(InlineKeyboardButton(text="⬅️ Назад", callback_data=f"roles:view:{role_choice}:page:{page - 1}"))
-    if page < pages - 1:
-        nav_row.append(InlineKeyboardButton(text="Вперёд ➡️", callback_data=f"roles:view:{role_choice}:page:{page + 1}"))
+    if pg.has_prev:
+        nav_row.append(InlineKeyboardButton(text="⬅️ Назад", callback_data=f"roles:view:{role_choice}:page:{pg.page - 1}"))
+    if pg.has_next:
+        nav_row.append(InlineKeyboardButton(text="Вперёд ➡️", callback_data=f"roles:view:{role_choice}:page:{pg.page + 1}"))
     if nav_row:
         kb.row(*nav_row)
 
@@ -95,26 +87,32 @@ async def _build_role_list_page(user_service: UserServiceInterface, role_choice:
 
 
 async def _build_all_list_page(user_service: UserServiceInterface, page: int) -> tuple[str, InlineKeyboardMarkup]:
-    users = await user_service.list_all_users()
-    users = _sort_users(users)
+    """
+    Построить страницу списка всех пользователей.
 
-    total = len(users)
-    pages = max(1, (total + PAGE_SIZE - 1) // PAGE_SIZE)
-    page = max(0, min(page, pages - 1))
-    start = page * PAGE_SIZE
-    end = min(start + PAGE_SIZE, total)
+    Args:
+        user_service: Сервис пользователей
+        page: Номер страницы
+
+    Returns:
+        tuple[str, InlineKeyboardMarkup]: Текст сообщения и клавиатура
+    """
+    users = await user_service.list_all_users()
+    users = sort_users(users)
+
+    pg = paginate(users, page, PAGE_SIZE)
 
     lines: list[str] = []
-    lines.append(f"📋 Все пользователи — страница {page + 1}/{pages}")
-    lines.append(f"Всего: {total}")
+    lines.append(f"📋 Все пользователи — страница {pg.page + 1}/{pg.total_pages}")
+    lines.append(f"Всего: {pg.total_items}")
     lines.append("")
 
     kb = InlineKeyboardBuilder()
 
-    if total == 0:
+    if pg.total_items == 0:
         lines.append("Пока нет ни одного пользователя.")
     else:
-        for u in users[start:end]:
+        for u in pg.items:
             role = getattr(u, "user_type", UserType.USER)
             name = u.display_name
             role_label = "SUPERUSER" if role == UserType.SUPERUSER else ("ADMIN" if role == UserType.ADMIN else "USER")
@@ -125,23 +123,23 @@ async def _build_all_list_page(user_service: UserServiceInterface, page: int) ->
                     kb.row(
                         InlineKeyboardButton(
                             text=f"Сделать USER — {name}",
-                            callback_data=f"roles:set:{u.tg_id}:{UserType.USER.value}:all:{page}",
+                            callback_data=f"roles:set:{u.tg_id}:{UserType.USER.value}:all:{pg.page}",
                         )
                     )
                 elif role == UserType.USER:
                     kb.row(
                         InlineKeyboardButton(
                             text=f"Сделать ADMIN — {name}",
-                            callback_data=f"roles:set:{u.tg_id}:{UserType.ADMIN.value}:all:{page}",
+                            callback_data=f"roles:set:{u.tg_id}:{UserType.ADMIN.value}:all:{pg.page}",
                         )
                     )
 
     # Навигация
     nav_row = []
-    if page > 0:
-        nav_row.append(InlineKeyboardButton(text="⬅️ Назад", callback_data=f"roles:view:all:page:{page - 1}"))
-    if page < pages - 1:
-        nav_row.append(InlineKeyboardButton(text="Вперёд ➡️", callback_data=f"roles:view:all:page:{page + 1}"))
+    if pg.has_prev:
+        nav_row.append(InlineKeyboardButton(text="⬅️ Назад", callback_data=f"roles:view:all:page:{pg.page - 1}"))
+    if pg.has_next:
+        nav_row.append(InlineKeyboardButton(text="Вперёд ➡️", callback_data=f"roles:view:all:page:{pg.page + 1}"))
     if nav_row:
         kb.row(*nav_row)
 
@@ -157,12 +155,13 @@ async def cmd_roles(
     message: types.Message,
     user_service: FromDishka[UserServiceInterface],
 ):
+    """Открыть меню управления ролями (только для суперпользователя)."""
     caller = await user_service.get_or_create(CreateUserEntity.from_aiogram(message.from_user))
-    if not _is_superuser(caller):
+    if not is_superuser(caller):
         await message.reply("🚫 Доступно только суперпользователю")
         return
 
-    await message.answer("⭐ Управление ролями", reply_markup=_build_admins_menu_kb())
+    await message.answer("⭐ Управление ролями", reply_markup=build_roles_menu_kb())
 
 
 @router.callback_query(F.data == "roles:menu")
@@ -171,11 +170,12 @@ async def cb_roles_menu(
     cq: types.CallbackQuery,
     user_service: FromDishka[UserServiceInterface],
 ):
+    """Вернуться в главное меню ролей."""
     caller = await user_service.get_or_create(CreateUserEntity.from_aiogram(cq.from_user))
-    if not _is_superuser(caller):
+    if not is_superuser(caller):
         await cq.answer("Нет доступа", show_alert=True)
         return
-    await cq.message.edit_text("⭐ Управление ролями", reply_markup=_build_admins_menu_kb())
+    await cq.message.edit_text("⭐ Управление ролями", reply_markup=build_roles_menu_kb())
     await cq.answer()
 
 
@@ -185,8 +185,9 @@ async def cb_roles_view(
     cq: types.CallbackQuery,
     user_service: FromDishka[UserServiceInterface],
 ):
+    """Просмотр списка пользователей по роли."""
     caller = await user_service.get_or_create(CreateUserEntity.from_aiogram(cq.from_user))
-    if not _is_superuser(caller):
+    if not is_superuser(caller):
         await cq.answer("Нет доступа", show_alert=True)
         return
 
@@ -212,8 +213,9 @@ async def cb_roles_set(
     cq: types.CallbackQuery,
     user_service: FromDishka[UserServiceInterface],
 ):
+    """Изменить роль пользователя."""
     caller = await user_service.get_or_create(CreateUserEntity.from_aiogram(cq.from_user))
-    if not _is_superuser(caller):
+    if not is_superuser(caller):
         await cq.answer("Нет доступа", show_alert=True)
         return
 

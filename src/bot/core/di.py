@@ -1,4 +1,5 @@
 from collections.abc import AsyncIterator
+from bot.domain.entities.constants import DEFAULT_MINUTE_STEP, DEFAULT_CHECK_INTERVAL
 
 import aiohttp
 from aiogram import Bot
@@ -7,13 +8,15 @@ from bot.application.services.notification import NotificationService
 from bot.application.services.scheduler import NotificationScheduler
 from bot.application.services.statistics import StatisticsService
 from bot.application.services.user import UserService
-from bot.core.config import BotConfig, RedisConfig, YandexDiskConfig, bot_config, redis_config, yadisk_config
+from bot.application.widgets.time_picker import TimePicker
+from bot.core.config import BotConfig, RedisConfig, YandexDiskConfig
 from bot.domain.repositories.notification import NotificationRepositoryInterface
 from bot.domain.repositories.statistics import StatisticsRepositoryInterface
 from bot.domain.repositories.user import UserRepositoryInterface
 from bot.domain.services.notification import NotificationServiceInterface
 from bot.domain.services.statistics import StatisticsServiceInterface
 from bot.domain.services.user import UserServiceInterface
+from bot.domain.services.scheduler import SchedulerServiceInterface
 from bot.infrastructure.repositories.notification import RedisNotificationRepository
 from bot.infrastructure.repositories.statistics import RedisStatisticsRepository
 from bot.infrastructure.repositories.user import RedisUserRepository
@@ -25,15 +28,15 @@ from redis.asyncio import ConnectionPool, Redis
 class ConfigProvider(Provider):
     @provide(scope=Scope.APP)
     def get_bot_config(self) -> BotConfig:
-        return bot_config
+        return BotConfig()
 
     @provide(scope=Scope.APP)
     def get_redis_config(self) -> RedisConfig:
-        return redis_config
+        return RedisConfig()
 
     @provide(scope=Scope.APP)
     def get_yadisk_config(self) -> YandexDiskConfig:
-        return yadisk_config
+        return YandexDiskConfig()
 
 
 class InfrastructureProvider(Provider):
@@ -116,8 +119,8 @@ class ServiceProvider(Provider):
         self,
         bot: Bot,
         notification_repository: NotificationRepositoryInterface,
-    ) -> NotificationScheduler:
-        return NotificationScheduler(bot, notification_repository, check_interval=60)
+    ) -> SchedulerServiceInterface:
+        return NotificationScheduler(bot, notification_repository, check_interval=DEFAULT_CHECK_INTERVAL)
 
     @provide(scope=Scope.APP)
     def get_polling_service(
@@ -143,12 +146,27 @@ class ServiceProvider(Provider):
         )
 
 
+class WidgetProvider(Provider):
+    """Провайдер UI-виджетов"""
+
+    @provide(scope=Scope.REQUEST)
+    def get_time_picker(self) -> TimePicker:
+        """
+        Предоставляет экземпляр виджета TimePicker
+
+        :return: настроенный TimePicker с дефолтными параметрами
+        """
+
+        return TimePicker(prefix="tp", minute_step=DEFAULT_MINUTE_STEP, show_cancel=True)
+
+
 async def create_container() -> AsyncContainer:
     container = make_async_container(
         ConfigProvider(),
         InfrastructureProvider(),
         RepositoryProvider(),
         ServiceProvider(),
+        WidgetProvider(),
     )
 
     return container

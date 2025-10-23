@@ -1,32 +1,16 @@
 from aiogram import Router, types, F
 from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
-from aiogram.utils.keyboard import InlineKeyboardBuilder
-from bot.domain.entities.course import Course, get_courses, get_course
+from bot.domain.entities.course import get_course
 from bot.domain.entities.mappings import StudyCourses, StudyGroups
 from bot.domain.entities.states import SettingsStates
 from bot.domain.entities.user import UpdateUserEntity
 from bot.domain.services.user import UserServiceInterface
+from bot.application.widgets.keyboards import build_courses_kb, build_groups_kb
 from dishka import FromDishka
 from dishka.integrations.aiogram import inject
 
 router = Router(name="settings")
-
-
-def build_courses_kb() -> types.InlineKeyboardMarkup:
-    kb = InlineKeyboardBuilder()
-    for code, course in get_courses().items():
-        kb.button(text=course.title, callback_data=f"course:{str(code.value)}")
-    kb.adjust(2)
-    return kb.as_markup()
-
-
-def build_groups_kb(course: Course) -> types.InlineKeyboardMarkup:
-    kb = InlineKeyboardBuilder()
-    for group in course.groups:
-        kb.button(text=str(group.value), callback_data=f"group:{str(course.code.value)}:{str(group.value)}")
-    kb.adjust(3)
-    return kb.as_markup()
 
 
 @router.message(Command("set"))
@@ -104,7 +88,7 @@ async def group_chosen(
             "✅ Настройки сохранены!\n"
             f"Курс: {course_title}\n"
             f"Группа: {group_enum.value}\n\n"
-            "Теперь я буду присылать уведомления по твоей группе.\n"
+            "Теперь я буду присылать уведомления по твоей группе.ав\n"
             "Используй /settings чтобы задать настройки уведомлений."
         )
     )

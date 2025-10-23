@@ -1,6 +1,5 @@
-import re
 from datetime import datetime, time, timedelta
-from typing import Iterable, Optional
+from typing import Optional
 
 from bot.common.logs import logger
 from bot.domain.entities.mappings import NotificationScheduleMode, COURSE_SUBJECTS
@@ -35,7 +34,7 @@ class NotificationService(NotificationServiceInterface):
         users = await self.user_service.list_all_users()
 
         # Обрабатываем задачи из очереди
-        async for task in self.repository.pop_from_queue():
+        async for task in await self.repository.pop_from_queue():
             # Для каждого пользователя проверяем, нужно ли ему это уведомление
             for user in users:
                 if await self._should_notify_user(user, task):
