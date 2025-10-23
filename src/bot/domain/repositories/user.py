@@ -1,17 +1,18 @@
 from abc import ABC, abstractmethod
 
-from redis.asyncio import Redis
-
 from bot.domain.entities.user import UserEntity, CreateUserEntity, UpdateUserEntity
 
 
 class UserRepositoryInterface(ABC):
-    def __init__(
-        self,
-        redis: Redis
-    ):
+    def __init__(self, redis, key_prefix: str = ''):
+        """
+        Инициализировать репозиторий
+
+        :param redis: клиент Redis
+        :param key_prefix: префикс для ключей в Redis
+        """
         self.redis = redis
-        self.prefix = "yadi-lp:user"
+        self._prefix = key_prefix.strip().rstrip(':') if key_prefix else ''
 
     @abstractmethod
     async def get_by_id(self, tg_id: int) -> UserEntity | None:

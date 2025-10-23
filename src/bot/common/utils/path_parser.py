@@ -114,7 +114,7 @@ def extract_group_from_path(path: str) -> Optional[StudyGroups]:
     """
     try:
         segments = [s for s in path.replace("\\", "/").split("/") if s]
-        values = set(g.value for g in StudyGroups)
+        values = {g for g in StudyGroups}
         for segment in segments:
             if segment in values:
                 # Вернём enum по значению

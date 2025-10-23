@@ -31,6 +31,7 @@ class LongPollServiceInterface(ABC):
         self.http_timeout = http_timeout
         self.key_prefix = key_prefix.strip().rstrip(":") if key_prefix else ""
         self._running = False
+        self._task = None
 
     @abstractmethod
     async def start(self):

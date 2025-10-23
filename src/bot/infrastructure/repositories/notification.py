@@ -17,7 +17,8 @@ class RedisNotificationRepository(NotificationRepositoryInterface):
         self.redis = redis
         self._prefix = key_prefix.strip().rstrip(':') if key_prefix else ''
 
-    def _to_str(self, v):
+    @staticmethod
+    def _to_str(v):
         return v.decode() if isinstance(v, (bytes, bytearray)) else v
 
     def _key(self, base: str) -> str:

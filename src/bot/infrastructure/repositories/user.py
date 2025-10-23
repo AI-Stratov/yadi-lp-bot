@@ -6,20 +6,10 @@ from bot.domain.repositories.user import UserRepositoryInterface
 
 class RedisUserRepository(UserRepositoryInterface):
     """Реализация репозитория пользователей на основе Redis"""
-
     PREFIX = 'users'
 
-    def __init__(self, redis, key_prefix: str = ''):
-        """
-        Инициализировать репозиторий
-
-        :param redis: клиент Redis
-        :param key_prefix: префикс для ключей в Redis
-        """
-        self.redis = redis
-        self._prefix = key_prefix.strip().rstrip(':') if key_prefix else ''
-
-    def _to_str(self, v):
+    @staticmethod
+    def _to_str(v):
         """Преобразовать байты в строку"""
         return v.decode() if isinstance(v, (bytes, bytearray)) else v
 

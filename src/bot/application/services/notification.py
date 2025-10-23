@@ -34,12 +34,12 @@ class NotificationService(NotificationServiceInterface):
         users = await self.user_service.list_all_users()
 
         # Обрабатываем задачи из очереди
-        async for task in await self.repository.pop_from_queue():
+        async for task in self.repository.pop_from_queue():  # NOQA
             # Для каждого пользователя проверяем, нужно ли ему это уведомление
             for user in users:
                 if await self._should_notify_user(user, task):
                     # Определяем время отправки
-                    scheduled_at = self._calculate_send_time(user, task)
+                    scheduled_at = self._calculate_send_time(user)
 
                     # Создаем персональное уведомление
                     notification = UserNotification(
@@ -86,7 +86,8 @@ class NotificationService(NotificationServiceInterface):
 
         return True
 
-    def _matches_user_group(self, user: UserEntity, task: NotificationTask) -> bool:
+    @staticmethod
+    def _matches_user_group(user: UserEntity, task: NotificationTask) -> bool:
         """True, если ограничение по группе не нарушено.
         - Если у задачи нет явной группы (лекция общая) - не ограничиваем по группе.
         - Если у задачи есть группа, то уведомляем только пользователей этой группы.
@@ -103,7 +104,8 @@ class NotificationService(NotificationServiceInterface):
         # Для групповой записи у пользователя должна быть задана совпадающая группа
         return user.user_study_group is not None and user.user_study_group == task.study_group
 
-    def _matches_user_course(self, user: UserEntity, task: NotificationTask) -> bool:
+    @staticmethod
+    def _matches_user_course(user: UserEntity, task: NotificationTask) -> bool:
         """Проверяет, относится ли файл к курсу пользователя"""
         # Если не удалось определить предмет - считаем файл нестандартным и не отправляем
         if not task.subject_code:
@@ -119,7 +121,7 @@ class NotificationService(NotificationServiceInterface):
         # Проверяем, есть ли предмет в списке для курса
         return task.subject_code in course_subjects
 
-    def _calculate_send_time(self, user: UserEntity, task: NotificationTask) -> Optional[datetime]:
+    def _calculate_send_time(self, user: UserEntity) -> Optional[datetime]:
         """Рассчитывает время отправки с учетом настроек пользователя"""
         now = datetime.now()
 
@@ -145,7 +147,8 @@ class NotificationService(NotificationServiceInterface):
 
         return now
 
-    def _next_scheduled_time(self, target_time: time) -> datetime:
+    @staticmethod
+    def _next_scheduled_time(target_time: time) -> datetime:
         """Возвращает следующее время отправки для режима AT_TIME"""
         now = datetime.now()
         scheduled = now.replace(
@@ -161,7 +164,8 @@ class NotificationService(NotificationServiceInterface):
 
         return scheduled
 
-    def _next_window_time(self, window_start: time, window_end: time) -> datetime:
+    @staticmethod
+    def _next_window_time(window_start: time, window_end: time) -> datetime:
         """Возвращает следующее время отправки для режима IN_WINDOW"""
         now = datetime.now()
 

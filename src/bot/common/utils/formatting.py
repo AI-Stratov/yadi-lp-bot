@@ -144,7 +144,7 @@ def format_notification_message(task) -> str:
         hashtags.append(f"#{sanitize_tag(task.topic.lower())}")
     # Группа
     if getattr(task, "study_group", None):
-        hashtags.append(f"#{sanitize_tag(task.study_group.value)}")
+        hashtags.append(f"#{sanitize_tag(str(task.study_group))}")
     # Предмет (код - короче и удобнее)
     if getattr(task, "subject_code", None):
         hashtags.append(f"#{sanitize_tag(task.subject_code)}")
@@ -156,18 +156,17 @@ def format_notification_message(task) -> str:
     link = task.download_url or task.public_url or ""
 
     # Собираем сообщение
-    lines: list[str] = []
-    lines.append(f"📚 <b>{subject_display or 'Неизвестно'}</b>")
+    lines: list[str] = [f"📚 <b>{subject_display or 'Неизвестно'}</b>"]
     if lesson_date_str:
         lines.append(f"📅 {lesson_date_str}")
     if teacher:
         lines.append(f"👨‍🏫 {teacher}")
     if hashtags:
         for h in hashtags:
-            # Разносим тегами по смыслу, но компактно - один тег в строке с соответствующим эмодзи
+            # Разносим тегами по смыслу
             if h.startswith('#лекция') or h.startswith('#семинар'):
                 lines.append(f"💼 {h}")
-            elif getattr(task, "study_group", None) and h.endswith(task.study_group.value):
+            elif getattr(task, "study_group", None) and h.endswith(str(task.study_group)):
                 lines.append(f"👥 {h}")
             elif getattr(task, "subject_code", None) and h.endswith(task.subject_code):
                 lines.append(f"📖 {h}")

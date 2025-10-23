@@ -15,10 +15,8 @@ class StatisticsFormatter:
         :param snap: снапшот статистики
         :return: отформатированный текст
         """
-        lines: list[str] = []
-        lines.append("📊 <b>Статистика пользователей</b>")
-        lines.append(f"• Всего: <b>{fmt_int(snap.users_total)}</b>")
-        lines.append(f"• Уведомления включены: <b>{fmt_int(snap.users_enabled)}</b>")
+        lines: list[str] = ["📊 <b>Статистика пользователей</b>", f"• Всего: <b>{fmt_int(snap.users_total)}</b>",
+                            f"• Уведомления включены: <b>{fmt_int(snap.users_enabled)}</b>"]
 
         if snap.by_course:
             parts = ", ".join(f"{k}: {fmt_int(v)}" for k, v in sorted(snap.by_course.items()))

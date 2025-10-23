@@ -4,6 +4,7 @@ from hashlib import sha256
 import json
 
 import aiohttp
+from redis.exceptions import ConnectionError as RedisConnectionError
 from bot.common.logs import logger
 from bot.domain.entities.notification import NotificationTask
 from bot.domain.services.long_poll import LongPollServiceInterface
@@ -21,6 +22,7 @@ from bot.common.utils.path_parser import (
 
 class YandexDiskPollingService(LongPollServiceInterface):
     async def start(self):
+        """Запустить цикл опроса публичной папки Я.Диска."""
         if self._running:
             return
         self._running = True
@@ -28,8 +30,9 @@ class YandexDiskPollingService(LongPollServiceInterface):
         logger.info("✅ Опрос Яндекс.Диска запущен")
 
     async def stop(self):
+        """Остановить цикл опроса и дождаться завершения фоновой задачи."""
         self._running = False
-        if hasattr(self, "_task"):
+        if hasattr(self, "_task") and self._task:
             self._task.cancel()
             try:
                 await self._task
@@ -38,7 +41,7 @@ class YandexDiskPollingService(LongPollServiceInterface):
         logger.info("🛑 Опрос Яндекс.Диска остановлен")
 
     async def _poll_loop(self):
-        """Основной цикл опроса."""
+        """Основной цикл опроса: собирает новые файлы и отправляет задания в очередь."""
         while self._running:
             try:
                 new_files = await self._check_for_new_files()
@@ -49,11 +52,24 @@ class YandexDiskPollingService(LongPollServiceInterface):
 
             await asyncio.sleep(self.poll_interval)
 
+    async def _safe_redis_get(self, key: str) -> str | bytes | None:
+        try:
+            return await self.redis.get(key)
+        except RedisConnectionError as e:
+            logger.error(f"Redis недоступен при GET {key}: {e}")
+            return None
+
+    async def _safe_redis_set(self, key: str, value: str, *, ex: int | None = None) -> None:
+        try:
+            await self.redis.set(key, value, ex=ex)
+        except RedisConnectionError as e:
+            logger.error(f"Redis недоступен при SET {key}: {e}")
+
     async def _check_for_new_files(self) -> int:
-        """Проверяет диск и добавляет новые файлы в очередь."""
+        """Проверяет диск и добавляет новые файлы в очередь. Возвращает количество новых задач."""
         # Читаем чекпоинт - время последней проверки
         checkpoint_key = self._get_checkpoint_key()
-        last_check = await self.redis.get(checkpoint_key)
+        last_check = await self._safe_redis_get(checkpoint_key)
         last_check_dt = parse_datetime(last_check)
 
         # Запоминаем время начала текущего обхода (без timezone)
@@ -76,7 +92,7 @@ class YandexDiskPollingService(LongPollServiceInterface):
             path = file_dict.get("path", "")
             g = extract_group_from_path(path)
             if g:
-                group_name: str = str(g.value)
+                group_name: str = str(g)  # StrEnum -> str
                 group_counts[group_name] = group_counts.get(group_name, 0) + 1
             else:
                 common_count += 1
@@ -91,13 +107,15 @@ class YandexDiskPollingService(LongPollServiceInterface):
 
         # Сохраняем задачи в очередь и обновляем чекпоинт
         if new_tasks:
-            await self.notification_service.enqueue_many(new_tasks)
-            # Сохраняем время начала обхода как новый чекпоинт
-            await self.redis.set(checkpoint_key, current_check_dt.isoformat())
+            try:
+                await self.notification_service.enqueue_many(new_tasks)
+            except Exception as e:
+                logger.error(f"Не удалось поставить задачи в очередь: {e}")
+            await self._safe_redis_set(checkpoint_key, current_check_dt.isoformat())
             logger.info(f"✅ Чекпоинт обновлен: {current_check_dt.isoformat()}")
         elif last_check_dt:
             # Даже если файлов нет, обновляем чекпоинт
-            await self.redis.set(checkpoint_key, current_check_dt.isoformat())
+            await self._safe_redis_set(checkpoint_key, current_check_dt.isoformat())
             logger.debug("⏭️ Новых файлов нет, чекпоинт обновлен")
 
         # Обновляем кэш статистики по группам (5 минут)
@@ -219,4 +237,4 @@ class YandexDiskPollingService(LongPollServiceInterface):
             "common": common,
             "computed_at": datetime.now().isoformat(),
         }
-        await self.redis.set(self._group_counts_cache_key(), json.dumps(payload), ex=ttl)
+        await self._safe_redis_set(self._group_counts_cache_key(), json.dumps(payload), ex=ttl)

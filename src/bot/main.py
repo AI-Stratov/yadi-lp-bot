@@ -4,12 +4,13 @@ from aiogram import Bot, Dispatcher
 from aiogram.fsm.storage.redis import RedisStorage
 from dishka.integrations.aiogram import setup_dishka
 from redis.asyncio import Redis
+
 from bot.application.handlers.base import setup_handlers, set_bot_commands
 from bot.application.services.long_poll import YandexDiskPollingService
-from bot.application.services.scheduler import NotificationScheduler
 from bot.common.logs import logger
 from bot.core.di import create_container
 from bot.domain.services.notification import NotificationServiceInterface
+from bot.domain.services.scheduler import SchedulerServiceInterface
 from bot.domain.services.user import UserServiceInterface
 
 
@@ -44,9 +45,9 @@ async def main():
         await polling_service.start()
         logger.info("✅ Long-polling сервис запущен")
 
-        # Запускаем планировщик уведомлений
-        notification_scheduler = await container.get(NotificationScheduler)
-        await notification_scheduler.start()
+        # Запускаем планировщик уведомлений (через интерфейс)
+        scheduler = await container.get(SchedulerServiceInterface)
+        await scheduler.start()
         logger.info("✅ Планировщик уведомлений запущен")
 
         # Запускаем фоновый процессор очереди уведомлений
@@ -69,7 +70,7 @@ async def main():
             except asyncio.CancelledError:
                 pass
 
-            await notification_scheduler.stop()
+            await scheduler.stop()
             await polling_service.stop()
     finally:
         # Закрываем контейнер

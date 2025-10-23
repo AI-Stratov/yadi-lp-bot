@@ -132,7 +132,6 @@ class TimePicker:
         if total_m >= 60:
             h = (h + (total_m // 60)) % 24
         elif total_m < 0:
-            # перескок назад по часам при отрицательных минутах
             h = (h - (abs(total_m) // 60 + (1 if abs(total_m) % 60 else 0))) % 24
 
         m = total_m % 60

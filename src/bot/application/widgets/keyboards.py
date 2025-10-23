@@ -21,7 +21,7 @@ def build_courses_kb() -> types.InlineKeyboardMarkup:
     """
     kb = InlineKeyboardBuilder()
     for code, course in get_courses().items():
-        kb.button(text=course.title, callback_data=f"course:{str(code.value)}")
+        kb.button(text=course.title, callback_data=f"course:{code}")
     kb.adjust(2)
     return kb.as_markup()
 
@@ -35,7 +35,7 @@ def build_groups_kb(course: Course) -> types.InlineKeyboardMarkup:
     """
     kb = InlineKeyboardBuilder()
     for group in course.groups:
-        kb.button(text=str(group.value), callback_data=f"group:{str(course.code.value)}:{str(group.value)}")
+        kb.button(text=f"{group}", callback_data=f"group:{course.code}:{group}")
     kb.adjust(3)
     return kb.as_markup()
 
@@ -282,4 +282,3 @@ def build_roles_menu_kb() -> types.InlineKeyboardMarkup:
     )
     kb.row(InlineKeyboardButton(text="📋 Все", callback_data="roles:view:all:page:0"))
     return kb.as_markup()
-

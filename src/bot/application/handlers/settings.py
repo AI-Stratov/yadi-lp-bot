@@ -6,18 +6,18 @@ from aiogram.fsm.context import FSMContext
 from dishka import FromDishka
 from dishka.integrations.aiogram import inject
 
-from bot.application.widgets.time_picker import TimePicker
 from bot.application.widgets.keyboards import (
     build_notification_modes_kb,
     build_notification_settings_kb,
     build_subjects_selection_kb,
 )
-from bot.domain.entities.constants import SUBJECTS_PAGE_SIZE
+from bot.application.widgets.time_picker import TimePicker
+from bot.common.utils.formatting import time_to_str, str_to_time
+from bot.domain.entities import constants as app_consts
 from bot.domain.entities.mappings import iter_subjects_for_course, NotificationScheduleMode
 from bot.domain.entities.states import NotificationSettingsStates
 from bot.domain.entities.user import UpdateUserEntity
 from bot.domain.services.user import UserServiceInterface
-from bot.common.utils.formatting import time_to_str, str_to_time
 
 router = Router(name="notification_settings")
 
@@ -43,7 +43,6 @@ async def open_settings(
 @inject
 async def toggle_notifications(
     callback: types.CallbackQuery,
-    state: FSMContext,
     user_service: FromDishka[UserServiceInterface],
 ):
     await callback.answer()
@@ -340,7 +339,7 @@ async def subjects_open(
         subject_keys=subj_keys,
         excluded_keys=excluded_current,
         page=0,
-        page_size=SUBJECTS_PAGE_SIZE
+        page_size=app_consts.SUBJECTS_PAGE_SIZE
     )
     await callback.message.edit_text("📚 Исключить предметы", reply_markup=kb)
 
@@ -371,7 +370,7 @@ async def subjects_toggle(callback: types.CallbackQuery, state: FSMContext):
         subject_keys=subj_keys,
         excluded_keys=excluded,
         page=page,
-        page_size=SUBJECTS_PAGE_SIZE
+        page_size=app_consts.SUBJECTS_PAGE_SIZE
     )
     await callback.message.edit_reply_markup(reply_markup=kb)
 
@@ -406,7 +405,7 @@ async def subjects_toggle_index(callback: types.CallbackQuery, state: FSMContext
         subject_keys=subj_keys,
         excluded_keys=excluded,
         page=page,
-        page_size=SUBJECTS_PAGE_SIZE
+        page_size=app_consts.SUBJECTS_PAGE_SIZE
     )
     await callback.message.edit_reply_markup(reply_markup=kb)
 
@@ -428,7 +427,7 @@ async def subjects_page(callback: types.CallbackQuery, state: FSMContext):
         subject_keys=subj_keys,
         excluded_keys=excluded,
         page=page,
-        page_size=SUBJECTS_PAGE_SIZE
+        page_size=app_consts.SUBJECTS_PAGE_SIZE
     )
     await callback.message.edit_reply_markup(reply_markup=kb)
 

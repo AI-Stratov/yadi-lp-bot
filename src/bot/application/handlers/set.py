@@ -15,6 +15,12 @@ router = Router(name="settings")
 
 @router.message(Command("set"))
 async def cmd_set(message: types.Message, state: FSMContext):
+    """
+    Открыть мастер выбора курса и группы пользователя.
+
+    :param message: входящее сообщение пользователя
+    :param state: FSM-состояние
+    """
     await state.clear()
 
     await message.answer(
@@ -26,6 +32,12 @@ async def cmd_set(message: types.Message, state: FSMContext):
 
 @router.callback_query(SettingsStates.choosing_course, F.data.startswith("course:"))
 async def course_chosen(callback: types.CallbackQuery, state: FSMContext):
+    """
+    Обработка выбора курса.
+
+    :param callback: callback-запрос
+    :param state: FSM-состояние
+    """
     await callback.answer()
     course_code_value = callback.data.split(":", 1)[1]
 
@@ -56,6 +68,13 @@ async def group_chosen(
     state: FSMContext,
     user_service: FromDishka[UserServiceInterface],
 ):
+    """
+    Обработка выбора группы; сохраняет курс и группу пользователя.
+
+    :param callback: callback-запрос
+    :param state: FSM-состояние
+    :param user_service: сервис пользователей
+    """
     await callback.answer()
 
     # Ожидаем формат: group:<COURSE_CODE>:<GROUP_VALUE>
@@ -81,14 +100,14 @@ async def group_chosen(
     await state.clear()
 
     course = get_course(course_enum)
-    course_title = course.title if course else course_enum.value
+    course_title = course.title if course else f"{course_enum}"
 
     await callback.message.edit_text(
         (
             "✅ Настройки сохранены!\n"
             f"Курс: {course_title}\n"
-            f"Группа: {group_enum.value}\n\n"
-            "Теперь я буду присылать уведомления по твоей группе.ав\n"
+            f"Группа: {group_enum}\n\n"
+            "Теперь я буду присылать уведомления по твоей группе.\n"
             "Используй /settings чтобы задать настройки уведомлений."
         )
     )

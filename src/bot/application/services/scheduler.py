@@ -70,7 +70,7 @@ class NotificationScheduler(SchedulerServiceInterface):
 
         logger.debug(f"🔍 Проверка уведомлений до {now.isoformat()}")
 
-        async for notification in await self.repository.get_due_notifications(now):
+        async for notification in self.repository.get_due_notifications(now): # NOQA
             try:
                 await self._send_notification(notification)
                 if notification.notification_id:

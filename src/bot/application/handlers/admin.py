@@ -1,4 +1,5 @@
 from aiogram import Router, types, F
+from aiogram.exceptions import TelegramBadRequest
 from aiogram.filters import Command
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 from aiogram.utils.keyboard import InlineKeyboardBuilder
@@ -6,10 +7,10 @@ from dishka import FromDishka
 from dishka.integrations.aiogram import inject
 
 from bot.application.widgets.keyboards import build_roles_menu_kb
-from bot.common.utils.permissions import is_superuser
 from bot.common.utils.pagination import paginate
+from bot.common.utils.permissions import is_superuser
 from bot.common.utils.sorting import sort_users
-from bot.domain.entities.constants import PAGE_SIZE
+from bot.domain.entities import constants as app_consts
 from bot.domain.entities.mappings import UserType
 from bot.domain.entities.user import CreateUserEntity
 from bot.domain.services.user import UserServiceInterface
@@ -48,12 +49,9 @@ async def _build_role_list_page(user_service: UserServiceInterface, role_choice:
     users = await user_service.get_users_by_type(role_type)
     users = sort_users(users)
 
-    pg = paginate(users, page, PAGE_SIZE)
+    pg = paginate(users, page, app_consts.PAGE_SIZE)
 
-    lines: list[str] = []
-    lines.append(f"{header} — страница {pg.page + 1}/{pg.total_pages}")
-    lines.append(f"Всего: {pg.total_items}")
-    lines.append("")
+    lines: list[str] = [f"{header} — страница {pg.page + 1}/{pg.total_pages}", f"Всего: {pg.total_items}", ""]
 
     kb = InlineKeyboardBuilder()
 
@@ -67,7 +65,7 @@ async def _build_role_list_page(user_service: UserServiceInterface, role_choice:
             kb.row(
                 InlineKeyboardButton(
                     text=f"{action_label} — {name}",
-                    callback_data=f"roles:set:{u.tg_id}:{new_role.value}:{role_choice}:{pg.page}",
+                    callback_data=f"roles:set:{u.tg_id}:{new_role}:{role_choice}:{pg.page}",
                 )
             )
 
@@ -100,12 +98,9 @@ async def _build_all_list_page(user_service: UserServiceInterface, page: int) ->
     users = await user_service.list_all_users()
     users = sort_users(users)
 
-    pg = paginate(users, page, PAGE_SIZE)
+    pg = paginate(users, page, app_consts.PAGE_SIZE)
 
-    lines: list[str] = []
-    lines.append(f"📋 Все пользователи — страница {pg.page + 1}/{pg.total_pages}")
-    lines.append(f"Всего: {pg.total_items}")
-    lines.append("")
+    lines: list[str] = [f"📋 Все пользователи — страница {pg.page + 1}/{pg.total_pages}", f"Всего: {pg.total_items}", ""]
 
     kb = InlineKeyboardBuilder()
 
@@ -123,14 +118,14 @@ async def _build_all_list_page(user_service: UserServiceInterface, page: int) ->
                     kb.row(
                         InlineKeyboardButton(
                             text=f"Сделать USER — {name}",
-                            callback_data=f"roles:set:{u.tg_id}:{UserType.USER.value}:all:{pg.page}",
+                            callback_data=f"roles:set:{u.tg_id}:{UserType.USER}:all:{pg.page}",
                         )
                     )
                 elif role == UserType.USER:
                     kb.row(
                         InlineKeyboardButton(
                             text=f"Сделать ADMIN — {name}",
-                            callback_data=f"roles:set:{u.tg_id}:{UserType.ADMIN.value}:all:{pg.page}",
+                            callback_data=f"roles:set:{u.tg_id}:{UserType.ADMIN}:all:{pg.page}",
                         )
                     )
 
@@ -175,7 +170,11 @@ async def cb_roles_menu(
     if not is_superuser(caller):
         await cq.answer("Нет доступа", show_alert=True)
         return
-    await cq.message.edit_text("⭐ Управление ролями", reply_markup=build_roles_menu_kb())
+    try:
+        await cq.message.edit_text("⭐ Управление ролями", reply_markup=build_roles_menu_kb())
+    except TelegramBadRequest as e:
+        if "message is not modified" not in str(e).lower():
+            raise
     await cq.answer()
 
 
@@ -195,7 +194,7 @@ async def cb_roles_view(
     try:
         _, _, role_choice, _, page_s = cq.data.split(":", 4)
         page = int(page_s)
-    except Exception:
+    except Exception: # pylint: disable=broad-except
         role_choice = "users"
         page = 0
 
@@ -203,7 +202,11 @@ async def cb_roles_view(
         text, markup = await _build_all_list_page(user_service, page)
     else:
         text, markup = await _build_role_list_page(user_service, role_choice, page)
-    await cq.message.edit_text(text, reply_markup=markup)
+    try:
+        await cq.message.edit_text(text, reply_markup=markup)
+    except TelegramBadRequest as e:
+        if "message is not modified" not in str(e).lower():
+            raise
     await cq.answer()
 
 
@@ -225,7 +228,7 @@ async def cb_roles_set(
         target_id = int(tg_id_s)
         new_role = UserType(role_s)
         page = int(page_s)
-    except Exception:
+    except Exception: # pylint: disable=broad-except
         await cq.answer("Некорректный запрос", show_alert=True)
         return
 
@@ -242,5 +245,9 @@ async def cb_roles_set(
         text, markup = await _build_all_list_page(user_service, page)
     else:
         text, markup = await _build_role_list_page(user_service, role_choice, page)
-    await cq.message.edit_text(text, reply_markup=markup)
+    try:
+        await cq.message.edit_text(text, reply_markup=markup)
+    except TelegramBadRequest as e:
+        if "message is not modified" not in str(e).lower():
+            raise
     await cq.answer("Обновлено")

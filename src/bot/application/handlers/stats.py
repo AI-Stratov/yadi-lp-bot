@@ -1,17 +1,18 @@
 from aiogram import Router, types, F
 from aiogram.filters import Command
 from aiogram.types import LinkPreviewOptions
+from aiogram.exceptions import TelegramBadRequest
 from dishka import FromDishka
 from dishka.integrations.aiogram import inject
 from redis.asyncio import Redis
 
 from bot.application.services.long_poll import YandexDiskPollingService
+from bot.domain.services.scheduler import SchedulerServiceInterface
 from bot.application.widgets.keyboards import build_stats_menu_kb, build_kv_list_kb
 from bot.common.utils.formatters import StatisticsFormatter
 from bot.common.utils.formatting import parse_dt_raw, fmt_secs, fmt_int, human_ago
 from bot.common.utils.permissions import is_admin
 from bot.domain.entities.user import CreateUserEntity
-from bot.domain.services.scheduler import SchedulerServiceInterface
 from bot.domain.services.statistics import StatisticsServiceInterface
 from bot.domain.services.user import UserServiceInterface
 
@@ -58,12 +59,18 @@ async def cb_stats_refresh(
     snap = await stats_service.build_snapshot()
     text = StatisticsFormatter.format_summary(snap)
 
-    await callback.message.edit_text(
-        text,
-        parse_mode="HTML",
-        reply_markup=build_stats_menu_kb(),
-        link_preview_options=LinkPreviewOptions(is_disabled=True),
-    )
+    try:
+        await callback.message.edit_text(
+            text,
+            parse_mode="HTML",
+            reply_markup=build_stats_menu_kb(),
+            link_preview_options=LinkPreviewOptions(is_disabled=True),
+        )
+    except TelegramBadRequest as e:
+        if "message is not modified" in str(e).lower():
+            pass
+        else:
+            raise
 
 
 @router.callback_query(F.data == "stats:disabled")
@@ -101,7 +108,13 @@ async def cb_stats_disabled_page(
     snap = await stats_service.build_snapshot()
     items = list(snap.top_excluded.items()) if getattr(snap, "top_excluded", None) else []
     kb = build_kv_list_kb(items=items, page=page, back_cb="stats:refresh", page_cb_prefix="stats:disabled:page")
-    await callback.message.edit_reply_markup(reply_markup=kb)
+    try:
+        await callback.message.edit_reply_markup(reply_markup=kb)
+    except TelegramBadRequest as e:
+        if "message is not modified" in str(e).lower():
+            pass
+        else:
+            raise
 
 
 @router.callback_query(F.data.startswith("stats:courses:page:"))
@@ -122,7 +135,13 @@ async def cb_stats_courses(
     snap = await stats_service.build_snapshot()
     items = sorted(list(snap.by_course.items()), key=lambda kv: (-(kv[1]), kv[0]))
     kb = build_kv_list_kb(items=items, page=page, back_cb="stats:refresh", page_cb_prefix="stats:courses:page")
-    await callback.message.edit_text("📚 Пользователи по курсам", reply_markup=kb)
+    try:
+        await callback.message.edit_text("📚 Пользователи по курсам", reply_markup=kb)
+    except TelegramBadRequest as e:
+        if "message is not modified" in str(e).lower():
+            pass
+        else:
+            raise
 
 
 @router.callback_query(F.data.startswith("stats:groups:page:"))
@@ -143,7 +162,13 @@ async def cb_stats_groups(
     snap = await stats_service.build_snapshot()
     items = sorted(list(snap.by_group.items()), key=lambda kv: (-(kv[1]), kv[0]))
     kb = build_kv_list_kb(items=items, page=page, back_cb="stats:refresh", page_cb_prefix="stats:groups:page")
-    await callback.message.edit_text("👥 Пользователи по группам", reply_markup=kb)
+    try:
+        await callback.message.edit_text("👥 Пользователи по группам", reply_markup=kb)
+    except TelegramBadRequest as e:
+        if "message is not modified" in str(e).lower():
+            pass
+        else:
+            raise
 
 
 @router.callback_query(F.data == "stats:nop")
@@ -191,11 +216,9 @@ async def cmd_status(
     queue_len = snap.queue_len
     scheduled_total = snap.scheduled_total
 
-    lines: list[str] = []
-    lines.append("ℹ️ <b>Статус сервиса</b>")
+    lines: list[str] = ["ℹ️ <b>Статус сервиса</b>", "🛰️ <b>Long‑poll</b>"]
 
     # Long-poll
-    lines.append("🛰️ <b>Long‑poll</b>")
     if poll_url and poll_url != "—":
         lines.append(f"  • URL: <a href=\"{poll_url}\">{poll_url}</a>")
     else:

@@ -1,5 +1,5 @@
 import bot.application.handlers.admin as admin
-import bot.application.handlers.set as set
+import bot.application.handlers.set as initial_set
 import bot.application.handlers.settings as settings
 import bot.application.handlers.start as start
 import bot.application.handlers.stats as stats
@@ -58,7 +58,7 @@ def setup_handlers(dp: Dispatcher):
 
 def setup_base(dp: Dispatcher):
     dp.include_router(start.router)
-    dp.include_router(set.router)
+    dp.include_router(initial_set.router)
     dp.include_router(settings.router)
     dp.include_router(stats.router)
     dp.include_router(admin.router)
