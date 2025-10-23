@@ -7,6 +7,7 @@ from bot.domain.entities.mappings import (
     StudyCourses,
     StudyGroups,
     NotificationScheduleMode,
+    UserType,
 )
 
 
@@ -27,6 +28,9 @@ class UserEntity(UserBaseEntity):
     user_course: StudyCourses | None = Field(default=None, description="Курс пользователя")
     user_study_group: StudyGroups | None = Field(default=None, description="Группа пользователя")
     excluded_disciplines: set[str] | None = Field(default_factory=set, description="Отключённые дисциплины")
+
+    # Роль пользователя
+    user_type: UserType = Field(default=UserType.USER)
 
     enable_notifications: bool = Field(default=True, description="Настройки уведомлений")
 
@@ -71,6 +75,9 @@ class UpdateUserEntity(BaseModel):
     user_course: StudyCourses | None = None
     user_study_group: StudyGroups | None = None
     excluded_disciplines: set[str] | None = None
+
+    # Роль
+    user_type: UserType | None = None
 
     enable_notifications: bool | None = None
 

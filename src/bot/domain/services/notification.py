@@ -5,11 +5,11 @@ from bot.domain.entities.notification import NotificationTask
 
 class NotificationServiceInterface(ABC):
     @abstractmethod
-    async def enqueue(self, task: NotificationTask) -> None:
-        """Поставить одну задачу на рассылку."""
+    async def enqueue_many(self, tasks: list[NotificationTask]) -> None:
+        """Добавляет задачи в общую очередь для обработки"""
         raise NotImplementedError
 
     @abstractmethod
-    async def enqueue_many(self, tasks: list[NotificationTask]) -> int:
-        """Поставить несколько задач; вернуть количество поставленных."""
+    async def process_queue(self) -> int:
+        """Обрабатывает очередь: распределяет уведомления по пользователям с учетом их настроек"""
         raise NotImplementedError

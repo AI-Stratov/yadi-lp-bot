@@ -26,6 +26,11 @@ build-backend = "hatchling.build"
 [tool.hatch.build.targets.wheel]
 packages = ["src/bot"]
 
+[dependency-groups]
+dev = [
+    "ruff>=0.14.1",
+]
+
 
 [project.scripts]
 yadi-lp = "bot.main:run"

@@ -4,15 +4,15 @@ from typing import Iterable
 
 
 class StudyGroups(StrEnum):
-    BKNAD251 = "251"
-    BKNAD252 = "252"
-    BKNAD253 = "253"
-    BKNAD241 = "241"
-    BKNAD242 = "242"
-    BKNAD231 = "231"
-    BKNAD232 = "232"
-    BKNAD211 = "211"
-    BKNAD212 = "212"
+    BKNAD251 = "БКНАД251"
+    BKNAD252 = "БКНАД252"
+    BKNAD253 = "БКНАД253"
+    BKNAD241 = "БКНАД241"
+    BKNAD242 = "БКНАД242"
+    BKNAD231 = "БКНАД231"
+    BKNAD232 = "БКНАД232"
+    BKNAD211 = "БКНАД211"
+    BKNAD212 = "БКНАД212"
 
 
 class StudyCourses(StrEnum):
@@ -22,10 +22,22 @@ class StudyCourses(StrEnum):
     COURSE4 = "COURSE4"
 
 
+class UserType(StrEnum):
+    USER = "USER"
+    ADMIN = "ADMIN"
+    SUPERUSER = "SUPERUSER"
+
+
 class NotificationScheduleMode(StrEnum):
     ASAP = "ASAP"  # Сразу по появлению
     AT_TIME = "AT_TIME"  # В определённое время
     IN_WINDOW = "IN_WINDOW"  # В указанном окне времени
+
+
+class NotificationStatus(StrEnum):
+    PENDING = "pending"  # Ожидает отправки
+    SENT = "sent"  # Отправлено
+    FAILED = "failed"  # Ошибка отправки
 
 
 # COURSES = {
@@ -50,12 +62,12 @@ SUBJECTS = {
     "Мат статистика 2": "Математическая статистика 2",
     "Математическая статистика 2": "Математическая статистика 2",
     "Машинное обучение 1": "Машинное обучение 1",
-    "НИС 'Машинное обучение и приложение 1'": "НИС 'Машинное обучение и приложение 1'",
-    "НИС 'Промышленное программирование 1'": "НИС 'Промышленное программирование 1'",
+    'НИС "Машинное обучение и приложение 1"': "НИС 'Машинное обучение и приложение 1'",
+    'НИС "Промышленное программирование 1"': "НИС 'Промышленное программирование 1'",
+    'НИС "Машинное обучение и приложение 2"': "НИС 'Машинное обучение и приложение 2'",
+    'НИС "Промышленное программирование 2"': "НИС 'Промышленное программирование 2'",
     "Глубинное обучение 2": "Глубинное обучение 2",
     "ДОЦ Психология": "ДОЦ Психология",
-    "НИС 'Машинное обучение и приложение 2'": "НИС 'Машинное обучение и приложение 2'",
-    "НИС 'Промышленное программирование 2'": "НИС 'Промышленное программирование 2'",
 }
 
 TOPICS = {
@@ -72,17 +84,17 @@ COURSE_SUBJECTS: dict[StudyCourses, list[str]] = {
     ],
     StudyCourses.COURSE3: [
         "Глубинное обучение 1", "Мат статистика 2", "Математическая статистика 2", "Машинное обучение 1",
-        "НИС 'Машинное обучение и приложение 1'", "НИС 'Промышленное программирование 1'"
+        'НИС "Машинное обучение и приложение 1"', 'НИС "Промышленное программирование 1"'
     ],
     StudyCourses.COURSE4: [
-        "Глубинное обучение 2", "ДОЦ Психология", "НИС 'Машинное обучение и приложение 2'",
-        "НИС 'Промышленное программирование 2'"
+        "Глубинное обучение 2", "ДОЦ Психология",
+        'НИС "Машинное обучение и приложение 2"', 'НИС "Промышленное программирование 2"'
     ],
 }
 
 
 def get_subject_keys_for_course(course: StudyCourses) -> list[str]:
-    """Вернуть список ключей предметов (по умолчанию — из COURSE_SUBJECTS; если пусто, fallback на все SUBJECTS)."""
+    """Вернуть список ключей предметов (по умолчанию - из COURSE_SUBJECTS; если пусто, fallback на все SUBJECTS)."""
     keys = COURSE_SUBJECTS.get(course) or []
     if keys:
         return keys
@@ -91,7 +103,7 @@ def get_subject_keys_for_course(course: StudyCourses) -> list[str]:
 
 
 def iter_subjects_for_course(course: StudyCourses) -> Iterable[tuple[str, str]]:
-    """Итератор по (key, display): key — ключ папки на диске, display — имя из SUBJECTS."""
+    """Итератор по (key, display): key - ключ папки на диске, display - имя из SUBJECTS."""
     for key in get_subject_keys_for_course(course):
         display = SUBJECTS.get(key, key)
         yield key, display

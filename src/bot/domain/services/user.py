@@ -2,6 +2,7 @@ from abc import ABC, abstractmethod
 
 from bot.domain.entities.user import UserEntity
 from bot.domain.entities.user import CreateUserEntity, UpdateUserEntity
+from bot.domain.entities.mappings import UserType
 
 
 class UserServiceInterface(ABC):
@@ -27,4 +28,13 @@ class UserServiceInterface(ABC):
 
     @abstractmethod
     async def list_all_users(self) -> list[UserEntity]:
+        raise NotImplementedError
+
+    # Новые методы для ролей
+    @abstractmethod
+    async def get_users_by_type(self, user_type: UserType) -> list[UserEntity]:
+        raise NotImplementedError
+
+    @abstractmethod
+    async def set_user_type(self, user_id: int, user_type: UserType) -> UserEntity:
         raise NotImplementedError

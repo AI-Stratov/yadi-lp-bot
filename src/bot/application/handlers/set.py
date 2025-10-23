@@ -2,14 +2,13 @@ from aiogram import Router, types, F
 from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
 from aiogram.utils.keyboard import InlineKeyboardBuilder
-from dishka import FromDishka
-from dishka.integrations.aiogram import inject
-
 from bot.domain.entities.course import Course, get_courses, get_course
 from bot.domain.entities.mappings import StudyCourses, StudyGroups
 from bot.domain.entities.states import SettingsStates
 from bot.domain.entities.user import UpdateUserEntity
 from bot.domain.services.user import UserServiceInterface
+from dishka import FromDishka
+from dishka.integrations.aiogram import inject
 
 router = Router(name="settings")
 
@@ -105,6 +104,7 @@ async def group_chosen(
             "✅ Настройки сохранены!\n"
             f"Курс: {course_title}\n"
             f"Группа: {group_enum.value}\n\n"
-            "Теперь я буду присылать уведомления по твоей группе."
+            "Теперь я буду присылать уведомления по твоей группе.\n"
+            "Используй /settings чтобы задать настройки уведомлений."
         )
     )

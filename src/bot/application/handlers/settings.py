@@ -85,11 +85,11 @@ def build_settings_kb(user: UserEntity) -> types.InlineKeyboardMarkup:
 
     # Дополнительные настройки по выбранному режиму
     if user.notification_mode == NotificationScheduleMode.AT_TIME:
-        t = _fmt_time(user.task_send_time) or "—"
+        t = _fmt_time(user.task_send_time) or "-"
         kb.row(InlineKeyboardButton(text=f"⏰ Время: {t}", callback_data="set_time"))
     elif user.notification_mode == NotificationScheduleMode.IN_WINDOW:
-        s = _fmt_time(user.delivery_window_start) or "—"
-        e = _fmt_time(user.delivery_window_end) or "—"
+        s = _fmt_time(user.delivery_window_start) or "-"
+        e = _fmt_time(user.delivery_window_end) or "-"
         kb.row(InlineKeyboardButton(text=f"🪟 Окно: {s}–{e}", callback_data="set_window"))
 
     # Предметы: показываем количество активных (всего по курсу минус исключённые)
@@ -101,7 +101,7 @@ def build_settings_kb(user: UserEntity) -> types.InlineKeyboardMarkup:
             active_cnt = max(total - excluded_cnt, 0)
             subjects_label = f"📚 Предметы ({active_cnt})"
     except Exception:
-        # в случае любой ошибки — не ломаем меню, показываем базовую надпись
+        # в случае любой ошибки - не ломаем меню, показываем базовую надпись
         pass
 
     kb.row(InlineKeyboardButton(text=subjects_label, callback_data="subjects"))
@@ -112,8 +112,8 @@ def build_settings_kb(user: UserEntity) -> types.InlineKeyboardMarkup:
 
 def _build_subjects_keyboard(*, subject_keys: list[str], excluded_keys: set[str], page: int) -> types.InlineKeyboardMarkup:
     """Пагинированная клавиатура для выбора исключаемых предметов.
-    subject_keys — список ключей (папок на диске), excluded_keys — текущие исключённые.
-    Зеленая точка — предмет включён; красная — исключён.
+    subject_keys - список ключей (папок на диске), excluded_keys - текущие исключённые.
+    Зеленая точка - предмет включён; красная - исключён.
     """
     page_size = SUBJECTS_PAGE_SIZE
     start_idx = page * page_size

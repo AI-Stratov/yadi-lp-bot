@@ -19,6 +19,7 @@ class LongPollServiceInterface(ABC):
         public_root_url: str,
         poll_interval: int,
         http_timeout: float,
+        key_prefix: str = "",
     ):
         self.bot = bot
         self.user_service = user_service
@@ -28,6 +29,7 @@ class LongPollServiceInterface(ABC):
         self.public_root_url = public_root_url
         self.poll_interval = poll_interval
         self.http_timeout = http_timeout
+        self.key_prefix = key_prefix.strip().rstrip(":") if key_prefix else ""
         self._running = False
 
     @abstractmethod

@@ -2,18 +2,24 @@ from collections.abc import AsyncIterator
 
 import aiohttp
 from aiogram import Bot
+from bot.application.services.long_poll import YandexDiskPollingService
+from bot.application.services.notification import NotificationService
+from bot.application.services.scheduler import NotificationScheduler
+from bot.application.services.statistics import StatisticsService
+from bot.application.services.user import UserService
+from bot.core.config import BotConfig, RedisConfig, YandexDiskConfig, bot_config, redis_config, yadisk_config
+from bot.domain.repositories.notification import NotificationRepositoryInterface
+from bot.domain.repositories.statistics import StatisticsRepositoryInterface
+from bot.domain.repositories.user import UserRepositoryInterface
+from bot.domain.services.notification import NotificationServiceInterface
+from bot.domain.services.statistics import StatisticsServiceInterface
+from bot.domain.services.user import UserServiceInterface
+from bot.infrastructure.repositories.notification import RedisNotificationRepository
+from bot.infrastructure.repositories.statistics import RedisStatisticsRepository
+from bot.infrastructure.repositories.user import RedisUserRepository
 from dishka import AsyncContainer, Provider, Scope, provide
 from dishka import make_async_container
 from redis.asyncio import ConnectionPool, Redis
-
-from bot.application.services.long_poll import YandexDiskPollingService
-from bot.application.services.notification import RedisNotificationService
-from bot.application.services.user import UserService
-from bot.core.config import BotConfig, RedisConfig, YandexDiskConfig, bot_config, redis_config, yadisk_config
-from bot.domain.repositories.user import UserRepositoryInterface
-from bot.domain.services.notification import NotificationServiceInterface
-from bot.domain.services.user import UserServiceInterface
-from bot.infrastructure.repositories.user import RedisUserRepository
 
 
 class ConfigProvider(Provider):
@@ -68,8 +74,16 @@ class InfrastructureProvider(Provider):
 
 class RepositoryProvider(Provider):
     @provide(scope=Scope.APP)
-    def get_user_repository(self, redis: Redis) -> UserRepositoryInterface:
-        return RedisUserRepository(redis)
+    def get_user_repository(self, redis: Redis, config: RedisConfig) -> UserRepositoryInterface:
+        return RedisUserRepository(redis, key_prefix=config.REDIS_KEY_PREFIX)
+
+    @provide(scope=Scope.APP)
+    def get_notification_repository(self, redis: Redis, config: RedisConfig) -> NotificationRepositoryInterface:
+        return RedisNotificationRepository(redis, key_prefix=config.REDIS_KEY_PREFIX)
+
+    @provide(scope=Scope.APP)
+    def get_statistics_repository(self, redis: Redis, rconf: RedisConfig, yconf: YandexDiskConfig) -> StatisticsRepositoryInterface:
+        return RedisStatisticsRepository(redis, key_prefix=rconf.REDIS_KEY_PREFIX, public_root_url=yconf.PUBLIC_ROOT_URL)
 
 
 class ServiceProvider(Provider):
@@ -77,12 +91,33 @@ class ServiceProvider(Provider):
     def get_user_service(
         self,
         user_repository: UserRepositoryInterface,
+        config: BotConfig,
     ) -> UserServiceInterface:
-        return UserService(user_repository)
+        return UserService(user_repository, config)
 
     @provide(scope=Scope.APP)
-    def get_notification_service(self, redis: Redis) -> NotificationServiceInterface:
-        return RedisNotificationService(redis)
+    def get_notification_service(
+        self,
+        notification_repository: NotificationRepositoryInterface,
+        user_service: UserServiceInterface,
+    ) -> NotificationServiceInterface:
+        return NotificationService(notification_repository, user_service)
+
+    @provide(scope=Scope.APP)
+    def get_statistics_service(
+        self,
+        user_service: UserServiceInterface,
+        repo: StatisticsRepositoryInterface,
+    ) -> StatisticsServiceInterface:
+        return StatisticsService(user_service, repo)
+
+    @provide(scope=Scope.APP)
+    def get_notification_scheduler(
+        self,
+        bot: Bot,
+        notification_repository: NotificationRepositoryInterface,
+    ) -> NotificationScheduler:
+        return NotificationScheduler(bot, notification_repository, check_interval=60)
 
     @provide(scope=Scope.APP)
     def get_polling_service(
@@ -93,6 +128,7 @@ class ServiceProvider(Provider):
         config: YandexDiskConfig,
         http_session: aiohttp.ClientSession,
         redis: Redis,
+        redis_config: RedisConfig,
     ) -> YandexDiskPollingService:
         return YandexDiskPollingService(
             bot=bot,
@@ -103,6 +139,7 @@ class ServiceProvider(Provider):
             public_root_url=config.PUBLIC_ROOT_URL,
             poll_interval=config.POLL_INTERVAL,
             http_timeout=config.HTTP_TIMEOUT,
+            key_prefix=redis_config.REDIS_KEY_PREFIX,
         )
 
 
