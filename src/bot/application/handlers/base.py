@@ -1,10 +1,11 @@
-import bot.application.handlers.admin as admin
+from aiogram import Bot, Dispatcher
+from aiogram.types import BotCommand, BotCommandScopeDefault, BotCommandScopeChat
+
+import bot.application.handlers.roles as roles
 import bot.application.handlers.set as initial_set
 import bot.application.handlers.settings as settings
 import bot.application.handlers.start as start
 import bot.application.handlers.stats as stats
-from aiogram import Bot, Dispatcher
-from aiogram.types import BotCommand, BotCommandScopeDefault, BotCommandScopeChat
 from bot.domain.entities.mappings import UserType
 from bot.domain.services.user import UserServiceInterface
 
@@ -22,8 +23,8 @@ def get_admin_commands() -> list[BotCommand]:
     return [
         BotCommand(command="set", description="Настроить курс и группу"),
         BotCommand(command="settings", description="Настройки уведомлений"),
-        BotCommand(command="stats", description="Статистика пользователей и очередей"),
-        BotCommand(command="status", description="Статус сервисов и чекпоинт"),
+        BotCommand(command="stats", description="Статистика сервиса"),
+        BotCommand(command="status", description="Статус сервиса"),
         BotCommand(command="help", description="Показать справку по командам"),
         BotCommand(command="cancel", description="Отменить текущую операцию"),
     ]
@@ -60,4 +61,4 @@ def setup_base(dp: Dispatcher):
     dp.include_router(initial_set.router)
     dp.include_router(settings.router)
     dp.include_router(stats.router)
-    dp.include_router(admin.router)
+    dp.include_router(roles.router)

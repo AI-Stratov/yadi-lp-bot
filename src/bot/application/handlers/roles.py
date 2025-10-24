@@ -22,13 +22,11 @@ async def _build_role_list_page(user_service: UserServiceInterface, role_choice:
     """
     Построить страницу списка пользователей по роли.
 
-    Args:
-        user_service: Сервис пользователей
-        role_choice: Выбранная роль (users/admins)
-        page: Номер страницы
+    :param user_service: Сервис пользователей
+    :param role_choice: Выбранная роль (users/admins)
+    :param page: Номер страницы
 
-    Returns:
-        tuple[str, InlineKeyboardMarkup]: Текст сообщения и клавиатура
+    :return: tuple[str, InlineKeyboardMarkup]: Текст сообщения и клавиатура
     """
     if role_choice == "users":
         role_type = UserType.USER

@@ -136,7 +136,7 @@ def extract_group_raw_from_path(path: str) -> Optional[str]:
 
     :example:
     /// extract_group_raw_from_path("/1 курс/МА/БКНАД999/file.mp4")
-    "БКНАД999"  Даже если не в enum StudyGroups
+    "БКНАД999" Даже если не в enum StudyGroups
     """
     segments = [s for s in path.replace("\\", "/").split("/") if s]
     pattern = re.compile(r"^БКНАД\d{3}$", re.IGNORECASE)
