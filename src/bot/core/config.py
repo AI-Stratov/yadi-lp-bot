@@ -33,6 +33,8 @@ class YandexDiskConfig(BaseSettings):
     model_config = SettingsConfigDict(env_file=str(env_path), env_file_encoding="utf-8", extra="allow")
 
 
-bot_config = BotConfig()
-redis_config = RedisConfig()
-yadisk_config = YandexDiskConfig()
+class NotificationsConfig(BaseSettings):
+    """Настройки интервалов для уведомлений."""
+    NOTIFICATION_CHECK_INTERVAL: int = 300  # периодичность проверки очереди и планировщика
+
+    model_config = SettingsConfigDict(env_file=str(env_path), env_file_encoding="utf-8", extra="allow")

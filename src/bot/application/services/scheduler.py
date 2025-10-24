@@ -1,13 +1,11 @@
 import asyncio
 from datetime import datetime
 
-from aiogram import Bot
 from aiogram.types import LinkPreviewOptions
 
 from bot.common.logs import logger
 from bot.common.utils.formatting import format_notification_message
 from bot.domain.entities.notification import UserNotification
-from bot.domain.repositories.notification import NotificationRepositoryInterface
 from bot.domain.services.scheduler import SchedulerServiceInterface
 
 
@@ -15,18 +13,6 @@ class NotificationScheduler(SchedulerServiceInterface):
     """
     Планировщик отправки уведомлений по расписанию
     """
-
-    def __init__(
-        self,
-        bot: Bot,
-        repository: NotificationRepositoryInterface,
-        check_interval: int = 60,
-    ):
-        self.bot = bot
-        self.repository = repository
-        self._check_interval = check_interval
-        self._running = False
-        self._task = None
 
     @property
     def check_interval(self) -> int:

@@ -88,12 +88,10 @@ async def _build_all_list_page(user_service: UserServiceInterface, page: int) ->
     """
     Построить страницу списка всех пользователей.
 
-    Args:
-        user_service: Сервис пользователей
-        page: Номер страницы
+    :param user_service: Сервис пользователей
+    :param page: Номер страницы
 
-    Returns:
-        tuple[str, InlineKeyboardMarkup]: Текст сообщения и клавиатура
+    :return: tuple[str, InlineKeyboardMarkup]: Текст сообщения и клавиатура
     """
     users = await user_service.list_all_users()
     users = sort_users(users)
@@ -194,7 +192,7 @@ async def cb_roles_view(
     try:
         _, _, role_choice, _, page_s = cq.data.split(":", 4)
         page = int(page_s)
-    except Exception: # pylint: disable=broad-except
+    except Exception:  # pylint: disable=broad-except
         role_choice = "users"
         page = 0
 
@@ -228,7 +226,7 @@ async def cb_roles_set(
         target_id = int(tg_id_s)
         new_role = UserType(role_s)
         page = int(page_s)
-    except Exception: # pylint: disable=broad-except
+    except Exception:  # pylint: disable=broad-except
         await cq.answer("Некорректный запрос", show_alert=True)
         return
 

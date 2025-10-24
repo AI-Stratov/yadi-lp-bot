@@ -3,6 +3,7 @@ import uuid
 from datetime import datetime
 from typing import AsyncIterator
 
+from bot.domain.entities.mappings import NotificationStatus
 from bot.domain.entities.notification import NotificationTask, UserNotification
 from bot.domain.repositories.notification import NotificationRepositoryInterface
 
@@ -78,12 +79,12 @@ class RedisNotificationRepository(NotificationRepositoryInterface):
 
     async def mark_as_sent(self, notification_id: str) -> None:
         key = self._status_key(notification_id)
-        await self.redis.hset(key, mapping={'status': 'sent', 'sent_at': datetime.now().isoformat()})
+        await self.redis.hset(key, mapping={'status': NotificationStatus.SENT, 'sent_at': datetime.now().isoformat()})
         await self.redis.expire(key, 86400 * 7)
 
     async def mark_as_failed(self, notification_id: str, error: str) -> None:
         key = self._status_key(notification_id)
-        await self.redis.hset(key, mapping={'status': 'failed', 'error': error, 'failed_at': datetime.now().isoformat()})
+        await self.redis.hset(key, mapping={'status': NotificationStatus.FAILED, 'error': error, 'failed_at': datetime.now().isoformat()})
         await self.redis.expire(key, 86400 * 7)
 
     async def is_duplicate(self, user_id: int, task: NotificationTask) -> bool:
@@ -92,5 +93,5 @@ class RedisNotificationRepository(NotificationRepositoryInterface):
         exists = await self.redis.sismember(key, file_id)
         if not exists:
             await self.redis.sadd(key, file_id)
-            await self.redis.expire(key, 86400 * 30)
+            await self.redis.expire(key, 86400 * 30) # Храним информацию об отправленных файлах 30 дней
         return bool(exists)

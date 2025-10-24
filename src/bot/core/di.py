@@ -1,28 +1,29 @@
 from collections.abc import AsyncIterator
-from bot.domain.entities.constants import DEFAULT_MINUTE_STEP, DEFAULT_CHECK_INTERVAL
 
 import aiohttp
 from aiogram import Bot
+from dishka import AsyncContainer, Provider, Scope, provide
+from dishka import make_async_container
+from redis.asyncio import ConnectionPool, Redis
+
 from bot.application.services.long_poll import YandexDiskPollingService
 from bot.application.services.notification import NotificationService
 from bot.application.services.scheduler import NotificationScheduler
 from bot.application.services.statistics import StatisticsService
 from bot.application.services.user import UserService
 from bot.application.widgets.time_picker import TimePicker
-from bot.core.config import BotConfig, RedisConfig, YandexDiskConfig
+from bot.core.config import BotConfig, RedisConfig, YandexDiskConfig, NotificationsConfig
+from bot.domain.entities.constants import DEFAULT_MINUTE_STEP
 from bot.domain.repositories.notification import NotificationRepositoryInterface
 from bot.domain.repositories.statistics import StatisticsRepositoryInterface
 from bot.domain.repositories.user import UserRepositoryInterface
 from bot.domain.services.notification import NotificationServiceInterface
+from bot.domain.services.scheduler import SchedulerServiceInterface
 from bot.domain.services.statistics import StatisticsServiceInterface
 from bot.domain.services.user import UserServiceInterface
-from bot.domain.services.scheduler import SchedulerServiceInterface
 from bot.infrastructure.repositories.notification import RedisNotificationRepository
 from bot.infrastructure.repositories.statistics import RedisStatisticsRepository
 from bot.infrastructure.repositories.user import RedisUserRepository
-from dishka import AsyncContainer, Provider, Scope, provide
-from dishka import make_async_container
-from redis.asyncio import ConnectionPool, Redis
 
 
 class ConfigProvider(Provider):
@@ -37,6 +38,10 @@ class ConfigProvider(Provider):
     @provide(scope=Scope.APP)
     def get_yadisk_config(self) -> YandexDiskConfig:
         return YandexDiskConfig()
+
+    @provide(scope=Scope.APP)
+    def get_notifications_config(self) -> NotificationsConfig:
+        return NotificationsConfig()
 
 
 class InfrastructureProvider(Provider):
@@ -119,8 +124,9 @@ class ServiceProvider(Provider):
         self,
         bot: Bot,
         notification_repository: NotificationRepositoryInterface,
+        notifications_config: NotificationsConfig,
     ) -> SchedulerServiceInterface:
-        return NotificationScheduler(bot, notification_repository, check_interval=DEFAULT_CHECK_INTERVAL)
+        return NotificationScheduler(bot, notification_repository, check_interval=notifications_config.NOTIFICATION_CHECK_INTERVAL)
 
     @provide(scope=Scope.APP)
     def get_polling_service(

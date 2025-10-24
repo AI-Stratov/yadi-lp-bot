@@ -31,7 +31,6 @@ def get_admin_commands() -> list[BotCommand]:
 
 def get_superuser_commands() -> list[BotCommand]:
     cmds = get_admin_commands()
-    # раньше была команда "admins" — теперь "roles"
     cmds.insert(0, BotCommand(command="roles", description="Управление ролями"))
     return cmds
 

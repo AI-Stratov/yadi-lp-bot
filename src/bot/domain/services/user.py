@@ -19,16 +19,6 @@ class UserServiceInterface(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    async def create_user(self, user_data: CreateUserEntity) -> UserEntity:
-        """
-        Создать нового пользователя
-
-        :param user_data: данные для создания пользователя
-        :return: созданный пользователь
-        """
-        raise NotImplementedError
-
-    @abstractmethod
     async def get_or_create(self, user_data: CreateUserEntity) -> UserEntity:
         """
         Получить существующего пользователя или создать нового
@@ -46,15 +36,6 @@ class UserServiceInterface(ABC):
         :param user_id: Telegram ID пользователя
         :param user_data: данные для обновления
         :return: обновленный пользователь
-        """
-        raise NotImplementedError
-
-    @abstractmethod
-    async def delete_user(self, user_id: int) -> None:
-        """
-        Удалить пользователя
-
-        :param user_id: Telegram ID пользователя
         """
         raise NotImplementedError
 

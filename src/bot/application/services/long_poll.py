@@ -17,6 +17,7 @@ from bot.common.utils.path_parser import (
     extract_group_raw_from_path,
     extract_teacher_from_filename,
     extract_date_from_filename,
+    extract_date_from_path,
 )
 
 
@@ -199,9 +200,37 @@ class YandexDiskPollingService(LongPollServiceInterface):
         # Формируем прямую ссылку на просмотр файла на Яндекс.Диске
         public_url = build_public_file_url(path, self.public_root_url)
 
-        # Парсим метаданные из названия файла
+        # Парсим метаданные из названия файла/пути
         teacher = extract_teacher_from_filename(file_name)
-        lesson_date = extract_date_from_filename(file_name) or parse_datetime(file_dict.get("modified"))
+
+        # Источник даты по приоритету: имя файла -> путь -> created -> modified
+        lesson_date_source = None
+        lesson_date = extract_date_from_filename(file_name)
+        if lesson_date:
+            lesson_date_source = "filename"
+        else:
+            lesson_date = extract_date_from_path(path)
+            if lesson_date:
+                lesson_date_source = "path"
+            else:
+                lesson_date = parse_datetime(file_dict.get("created"))
+                if lesson_date:
+                    lesson_date_source = "created"
+                else:
+                    lesson_date = parse_datetime(file_dict.get("modified"))
+                    if lesson_date:
+                        lesson_date_source = "modified"
+
+        if lesson_date_source:
+            logger.debug(
+                "📅 lesson_date=%s (source=%s) file_name='%s' path='%s'",
+                lesson_date.isoformat() if lesson_date else None,
+                lesson_date_source,
+                file_name,
+                path,
+            )
+        else:
+            logger.debug("📅 lesson_date not found in filename/path/created/modified for '%s'", file_name)
 
         return NotificationTask(
             subject_code=subject_code,

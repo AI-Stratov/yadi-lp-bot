@@ -145,7 +145,7 @@ def format_notification_message(task) -> str:
     # Группа
     if getattr(task, "study_group", None):
         hashtags.append(f"#{sanitize_tag(str(task.study_group))}")
-    # Предмет (код - короче и удобнее)
+    # Предмет (код)
     if getattr(task, "subject_code", None):
         hashtags.append(f"#{sanitize_tag(task.subject_code)}")
     # Преподаватель (как доп. тег для поиска)
@@ -153,7 +153,8 @@ def format_notification_message(task) -> str:
         hashtags.append(f"#{sanitize_tag(teacher)}")
 
     # Выбираем ссылку: download_url предпочтительнее, иначе public_url
-    link = task.download_url or task.public_url or ""
+    public_link = task.public_url or ""
+    download_link = task.download_url or ""
 
     # Собираем сообщение
     lines: list[str] = [f"📚 <b>{subject_display or 'Неизвестно'}</b>"]
@@ -172,8 +173,10 @@ def format_notification_message(task) -> str:
                 lines.append(f"📖 {h}")
             else:
                 lines.append(f"🏷️ {h}")
-    if link:
-        lines.append(f"\n🔗 <a href='{link}'>Смотреть видео</a>")
+    if public_link:
+        lines.append(f"\n🔗 <a href='{public_link}'>Смотреть видео</a>")
+    if download_link:
+        lines.append(f"🔗 <a href='{download_link}'>Скачать видео</a>")
     else:
         lines.append(f"\n📄 Файл: {task.file_name}")
 

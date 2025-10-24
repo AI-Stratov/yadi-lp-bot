@@ -60,7 +60,7 @@ def extract_subject_from_path(path: str) -> Optional[str]:
     :return: код предмета (имя папки) если найдено, иначе None
 
     :example:
-        >>> extract_subject_from_path("/1 курс/МА/Лекция/file.mp4")
+        /// extract_subject_from_path("/1 курс/МА/Лекция/file.mp4")
         "МА"
     """
     try:
@@ -83,7 +83,7 @@ def extract_topic_from_path(path: str) -> Optional[str]:
     :return: название темы если найдено, иначе None
 
     :example:
-        >>> extract_topic_from_path("/1 курс/МА/Лекция/file.mp4")
+        /// extract_topic_from_path("/1 курс/МА/Лекция/file.mp4")
         "Лекция"
     """
     try:
@@ -107,9 +107,9 @@ def extract_group_from_path(path: str) -> Optional[StudyGroups]:
     :return: значение enum StudyGroups если найдено, иначе None
 
     :example:
-        >>> extract_group_from_path("/1 курс/МА/БКНАД252/file.mp4")
+        /// extract_group_from_path("/1 курс/МА/БКНАД252/file.mp4")
         StudyGroups.BKNAD252
-        >>> extract_group_from_path("/1 курс/ЛА/Лекция/file.mp4")
+        /// extract_group_from_path("/1 курс/ЛА/Лекция/file.mp4")
         None  # Общая лекция, без конкретной группы
     """
     try:
@@ -135,8 +135,8 @@ def extract_group_raw_from_path(path: str) -> Optional[str]:
     :return: сырой код группы (строка) если найден, иначе None
 
     :example:
-        >>> extract_group_raw_from_path("/1 курс/МА/БКНАД999/file.mp4")
-        "БКНАД999"  # Даже если не в enum StudyGroups
+    /// extract_group_raw_from_path("/1 курс/МА/БКНАД999/file.mp4")
+    "БКНАД999"  Даже если не в enum StudyGroups
     """
     segments = [s for s in path.replace("\\", "/").split("/") if s]
     pattern = re.compile(r"^БКНАД\d{3}$", re.IGNORECASE)
@@ -156,7 +156,7 @@ def extract_teacher_from_filename(filename: str) -> Optional[str]:
     :return: имя преподавателя (например, "Лобода А.А.") если найдено, иначе None
 
     :example:
-        >>> extract_teacher_from_filename("Лобода А.А. 2025-10-15T08-08-19Z.mp4")
+        /// extract_teacher_from_filename("Лобода А.А. 2025-10-15T08-08-19Z.mp4")
         "Лобода А.А."
     """
     # Паттерн: Фамилия И.О. (кириллица + точки)
@@ -170,35 +170,97 @@ def extract_teacher_from_filename(filename: str) -> Optional[str]:
     return None
 
 
+# -------------------- Расширенный парсинг даты/времени --------------------
+
+def _try_build_datetime(year: int, month: int, day: int, hour: int | None, minute: int | None, second: int | None) -> Optional[datetime]:
+    try:
+        return datetime(year, month, day, hour or 0, minute or 0, second or 0)
+    except ValueError:
+        return None
+
+
+def _extract_datetime_from_text(text: str) -> Optional[datetime]:
+    """
+    Универсальный поиск даты/времени в тексте по нескольким распространённым форматам.
+
+    Поддерживаемые форматы (время необязательно):
+    - YYYY-MM-DD[ T|_ ]HH[:|.|-]MM([:|.|-]SS)?(Z)?
+    - YYYY-MM-DD
+    - DD.MM.YYYY[ T|_ ]HH[:|.|-]MM([:|.|-]SS)?
+    - DD.MM.YYYY
+    - YYYY.MM.DD[ T|_ ]HH[:|.|-]MM([:|.|-]SS)?
+    - YYYY.MM.DD
+    """
+    if not text:
+        return None
+
+    # 1) ISO-подобный: 2025-10-15T08-08-19Z, 2025-10-15 08:08, 2025-10-15_08.08.19
+    iso_like = re.search(r'(\d{4})-(\d{2})-(\d{2})(?:[T _](\d{2})[:\-.](\d{2})(?:[:\-.](\d{2}))?Z?)?', text)
+    if iso_like:
+        y, m, d = int(iso_like.group(1)), int(iso_like.group(2)), int(iso_like.group(3))
+        hh = int(iso_like.group(4)) if iso_like.group(4) else None
+        mm = int(iso_like.group(5)) if iso_like.group(5) else None
+        ss = int(iso_like.group(6)) if iso_like.group(6) else None
+        dt = _try_build_datetime(y, m, d, hh, mm, ss)
+        if dt:
+            return dt
+
+    # 2) ДД.ММ.ГГГГ [время]
+    dmy = re.search(r'(\d{2})[.-](\d{2})[.-](\d{4})(?:[T _](\d{2})[.:\-](\d{2})(?:[.:\-](\d{2}))?)?', text)
+    if dmy:
+        d, m, y = int(dmy.group(1)), int(dmy.group(2)), int(dmy.group(3))
+        hh = int(dmy.group(4)) if dmy.group(4) else None
+        mm = int(dmy.group(5)) if dmy.group(5) else None
+        ss = int(dmy.group(6)) if dmy.group(6) else None
+        dt = _try_build_datetime(y, m, d, hh, mm, ss)
+        if dt:
+            return dt
+
+    # 3) ГГГГ.ММ.ДД [время]
+    ymd_dots = re.search(r'(\d{4})[.-](\d{2})[.-](\d{2})(?:[T _](\d{2})[.:\-](\d{2})(?:[.:\-](\d{2}))?)?', text)
+    if ymd_dots:
+        y, m, d = int(ymd_dots.group(1)), int(ymd_dots.group(2)), int(ymd_dots.group(3))
+        hh = int(ymd_dots.group(4)) if ymd_dots.group(4) else None
+        mm = int(ymd_dots.group(5)) if ymd_dots.group(5) else None
+        ss = int(ymd_dots.group(6)) if ymd_dots.group(6) else None
+        dt = _try_build_datetime(y, m, d, hh, mm, ss)
+        if dt:
+            return dt
+
+    return None
+
+
 def extract_date_from_filename(filename: str) -> Optional[datetime]:
     """
     Извлечение даты занятия из имени файла
 
-    Ожидаемые форматы:
-    - '2025-10-15T08-08-19Z'
-    - '2025-10-15'
+    Поддерживаемые форматы (время опционально):
+    - '2025-10-15T08-08-19Z', '2025-10-15 08:08:19', '2025-10-15'
+    - '15.10.2025', '15.10.2025 08:08'
+    - '2025.10.15'
 
     :param filename: имя файла
     :return: распарсенный datetime если найден, иначе None
 
     :example:
-        >>> extract_date_from_filename("Лобода А.А. 2025-10-15T08-08-19Z.mp4")
+        /// extract_date_from_filename("Лобода А.А. 2025-10-15T08-08-19Z.mp4")
         datetime(2025, 10, 15, 8, 8, 19)
     """
-    # Паттерн: ISO-подобная дата в названии
-    # Формат: YYYY-MM-DDTHH-MM-SSZ или YYYY-MM-DD
-    pattern = r'(\d{4})-(\d{2})-(\d{2})(?:T(\d{2})-(\d{2})-(\d{2})Z?)?'
-    match = re.search(pattern, filename)
+    return _extract_datetime_from_text(filename)
 
-    if match:
-        year, month, day = int(match.group(1)), int(match.group(2)), int(match.group(3))
-        hour = int(match.group(4)) if match.group(4) else 0
-        minute = int(match.group(5)) if match.group(5) else 0
-        second = int(match.group(6)) if match.group(6) else 0
 
-        try:
-            return datetime(year, month, day, hour, minute, second)
-        except ValueError:
-            pass
+def extract_date_from_path(path: str) -> Optional[datetime]:
+    """
+    Извлечь дату/время занятия из сегментов пути.
 
+    Часто дата указывается в названии папки (например, "Лекция 15.10.2025" или "2025-10-15").
+    Сканируем сегменты пути с конца к началу (ближайшие к файлу приоритетнее).
+    """
+    if not path:
+        return None
+    segments = [s for s in path.replace('\\', '/').split('/') if s]
+    for segment in reversed(segments):
+        dt = _extract_datetime_from_text(segment)
+        if dt:
+            return dt
     return None

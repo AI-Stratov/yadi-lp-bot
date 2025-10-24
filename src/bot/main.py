@@ -8,6 +8,7 @@ from redis.asyncio import Redis
 from bot.application.handlers.base import setup_handlers, set_bot_commands
 from bot.application.services.long_poll import YandexDiskPollingService
 from bot.common.logs import logger
+from bot.core.config import NotificationsConfig
 from bot.core.di import create_container
 from bot.domain.services.notification import NotificationServiceInterface
 from bot.domain.services.scheduler import SchedulerServiceInterface
@@ -50,10 +51,16 @@ async def main():
         await scheduler.start()
         logger.info("✅ Планировщик уведомлений запущен")
 
+        # Настройки интервала для процессора очереди
+        notif_conf = await container.get(NotificationsConfig)
+
         # Запускаем фоновый процессор очереди уведомлений
         notification_service = await container.get(NotificationServiceInterface)
         queue_processor_task = asyncio.create_task(
-            _process_notification_queue_loop(notification_service),
+            _process_notification_queue_loop(
+                notification_service,
+                interval=notif_conf.NOTIFICATION_CHECK_INTERVAL
+            ),
             name="notification_queue_processor"
         )
         logger.info("✅ Процессор очереди уведомлений запущен")
@@ -78,23 +85,23 @@ async def main():
         logger.info("👋 Бот остановлен")
 
 
-async def _process_notification_queue_loop(notification_service: NotificationServiceInterface):
+async def _process_notification_queue_loop(
+    notification_service: NotificationServiceInterface,
+    *,
+    interval: int
+):
     """Фоновая задача для обработки очереди уведомлений"""
     while True:
         try:
-            processed = await notification_service.process_queue()
-            if processed == 0:
-                # Если очередь пуста, ждём дольше
-                await asyncio.sleep(30)
-            else:
-                # Если были задачи, проверяем чаще
-                await asyncio.sleep(5)
+            await notification_service.process_queue()
+            await asyncio.sleep(interval)
         except asyncio.CancelledError:
             logger.info("🛑 Процессор очереди уведомлений остановлен")
             raise
         except Exception as e:
             logger.exception(f"Ошибка в процессоре очереди уведомлений: {e}")
-            await asyncio.sleep(10)
+            # Небольшая задержка перед повтором
+            await asyncio.sleep(interval)
 
 
 def run():
