@@ -7,7 +7,6 @@
 from abc import ABC, abstractmethod
 
 from aiogram import Bot
-
 from bot.domain.repositories.notification import NotificationRepositoryInterface
 
 

@@ -1,10 +1,9 @@
 from aiogram import Router, types
 from aiogram.filters import CommandStart
-from dishka import FromDishka
-from dishka.integrations.aiogram import inject
-
 from bot.domain.entities.user import CreateUserEntity
 from bot.domain.services.user import UserServiceInterface
+from dishka import FromDishka
+from dishka.integrations.aiogram import inject
 
 router = Router(name="start")
 

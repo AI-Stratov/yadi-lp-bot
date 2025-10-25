@@ -1,14 +1,13 @@
 from datetime import datetime, time
 
 from aiogram import types
-from pydantic import BaseModel, Field
-
 from bot.domain.entities.mappings import (
     StudyCourses,
     StudyGroups,
     NotificationScheduleMode,
     UserType,
 )
+from pydantic import BaseModel, Field
 
 
 class UserBaseEntity(BaseModel):

@@ -1,6 +1,5 @@
-from pydantic import BaseModel
-
 from bot.domain.entities.mappings import StudyCourses, StudyGroups
+from pydantic import BaseModel
 
 
 class Course(BaseModel):

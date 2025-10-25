@@ -6,13 +6,8 @@ from typing import Literal
 
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 from aiogram.utils.keyboard import InlineKeyboardBuilder
-
 from bot.domain.entities.constants import DEFAULT_MINUTE_STEP, DEFAULT_PREFIX
 
-
-# ============================================================================
-# Класс TimePicker - объектно-ориентированный подход
-# ============================================================================
 
 class TimePicker:
     """

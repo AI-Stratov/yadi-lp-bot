@@ -33,13 +33,11 @@ def paginate(items: list[T], page: int, page_size: int) -> Page[T]:
     """
     Разбить список на страницы.
 
-    Args:
-        items: Список элементов для пагинации
-        page: Номер страницы (начиная с 0)
-        page_size: Размер страницы
+    :param items: Список элементов для пагинации
+    :param page: Номер страницы (начиная с 0)
+    :param page_size: Размер страницы
 
-    Returns:
-        Page: Объект с результатами пагинации
+    :return: Page: Объект с результатами пагинации
     """
     total = len(items)
     total_pages = max(1, (total + page_size - 1) // page_size)
@@ -57,4 +55,3 @@ def paginate(items: list[T], page: int, page_size: int) -> Page[T]:
         start_index=start,
         end_index=end,
     )
-

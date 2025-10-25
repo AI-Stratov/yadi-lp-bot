@@ -90,14 +90,10 @@ def get_subject_keys_for_course(course: StudyCourses) -> list[str]:
     """
     Вернуть список ключей предметов для курса.
 
-    Args:
-        course: Код курса
+    :param course: Код курса
+    :return: list[str] Список ключей предметов
 
-    Returns:
-        list[str]: Список ключей предметов
-
-    Raises:
-        ValueError: Если для курса не настроены предметы
+    :raise: ValueError: Если для курса не настроены предметы
     """
     keys = COURSE_SUBJECTS.get(course)
     if not keys:

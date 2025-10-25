@@ -5,21 +5,11 @@ from bot.common.logs import logger
 from bot.domain.entities.mappings import NotificationScheduleMode, COURSE_SUBJECTS
 from bot.domain.entities.notification import NotificationTask, UserNotification
 from bot.domain.entities.user import UserEntity
-from bot.domain.repositories.notification import NotificationRepositoryInterface
 from bot.domain.services.notification import NotificationServiceInterface
-from bot.domain.services.user import UserServiceInterface
 
 
 class NotificationService(NotificationServiceInterface):
     """Сервис обработки уведомлений с фильтрацией и планированием"""
-
-    def __init__(
-        self,
-        notification_repository: NotificationRepositoryInterface,
-        user_service: UserServiceInterface,
-    ):
-        self.repository = notification_repository
-        self.user_service = user_service
 
     async def enqueue_many(self, tasks: list[NotificationTask]) -> None:
         """Добавляет задачи в общую очередь для обработки"""

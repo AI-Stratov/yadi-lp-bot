@@ -2,10 +2,9 @@ from abc import ABC, abstractmethod
 
 import aiohttp
 from aiogram import Bot
-from redis.asyncio import Redis
-
 from bot.domain.services.notification import NotificationServiceInterface
 from bot.domain.services.user import UserServiceInterface
+from redis.asyncio import Redis
 
 
 class LongPollServiceInterface(ABC):

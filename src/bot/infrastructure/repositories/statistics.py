@@ -3,17 +3,10 @@ from datetime import datetime
 from hashlib import sha256
 from typing import Optional
 
-from redis.asyncio import Redis
-
 from bot.domain.repositories.statistics import StatisticsRepositoryInterface
 
 
 class RedisStatisticsRepository(StatisticsRepositoryInterface):
-    def __init__(self, redis: Redis, key_prefix: str, public_root_url: str):
-        self.redis = redis
-        self.key_prefix = key_prefix.strip().rstrip(":") if key_prefix else ""
-        self.public_root_url = public_root_url
-
     def _key(self, base: str) -> str:
         return f"{self.key_prefix}:{base}" if self.key_prefix else base
 
@@ -60,4 +53,3 @@ class RedisStatisticsRepository(StatisticsRepositoryInterface):
             return groups, common, computed_at
         except Exception:
             return {}, 0, None
-

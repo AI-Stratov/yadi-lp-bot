@@ -9,15 +9,6 @@ from bot.domain.repositories.notification import NotificationRepositoryInterface
 
 
 class RedisNotificationRepository(NotificationRepositoryInterface):
-    BASE_QUEUE = 'notifications:queue'
-    BASE_USER = 'notifications:user:{user_id}'
-    BASE_SENT = 'notifications:sent:{user_id}'
-    BASE_STATUS = 'notifications:status:{notification_id}'
-
-    def __init__(self, redis, key_prefix: str = ''):
-        self.redis = redis
-        self._prefix = key_prefix.strip().rstrip(':') if key_prefix else ''
-
     @staticmethod
     def _to_str(v):
         return v.decode() if isinstance(v, (bytes, bytearray)) else v
@@ -93,5 +84,5 @@ class RedisNotificationRepository(NotificationRepositoryInterface):
         exists = await self.redis.sismember(key, file_id)
         if not exists:
             await self.redis.sadd(key, file_id)
-            await self.redis.expire(key, 86400 * 30) # Храним информацию об отправленных файлах 30 дней
+            await self.redis.expire(key, 86400 * 30)  # Храним информацию об отправленных файлах 30 дней
         return bool(exists)

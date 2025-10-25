@@ -2,7 +2,6 @@
 name = "yadi-lp-bot"
 version = "0.1.0"
 description = "Telegram bot for Yandex.Disk lecture notifications"
-readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
   "aiogram>=3.22.0",
@@ -28,7 +27,7 @@ packages = ["src/bot"]
 
 [dependency-groups]
 dev = [
-    "ruff>=0.14.1",
+  "ruff>=0.14.1",
 ]
 
 

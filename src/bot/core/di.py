@@ -2,10 +2,6 @@ from collections.abc import AsyncIterator
 
 import aiohttp
 from aiogram import Bot
-from dishka import AsyncContainer, Provider, Scope, provide
-from dishka import make_async_container
-from redis.asyncio import ConnectionPool, Redis
-
 from bot.application.services.long_poll import YandexDiskPollingService
 from bot.application.services.notification import NotificationService
 from bot.application.services.scheduler import NotificationScheduler
@@ -24,6 +20,9 @@ from bot.domain.services.user import UserServiceInterface
 from bot.infrastructure.repositories.notification import RedisNotificationRepository
 from bot.infrastructure.repositories.statistics import RedisStatisticsRepository
 from bot.infrastructure.repositories.user import RedisUserRepository
+from dishka import AsyncContainer, Provider, Scope, provide
+from dishka import make_async_container
+from redis.asyncio import ConnectionPool, Redis
 
 
 class ConfigProvider(Provider):

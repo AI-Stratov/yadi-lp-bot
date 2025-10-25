@@ -18,4 +18,3 @@ class StatsSnapshot(BaseModel):
     disk_groups: dict[str, int] = Field(default_factory=dict)
     disk_common: int = 0
     disk_computed_at: Optional[datetime] = None
-

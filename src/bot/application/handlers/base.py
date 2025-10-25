@@ -1,11 +1,11 @@
-from aiogram import Bot, Dispatcher
-from aiogram.types import BotCommand, BotCommandScopeDefault, BotCommandScopeChat
-
+import bot.application.handlers.help as help
 import bot.application.handlers.roles as roles
 import bot.application.handlers.set as initial_set
 import bot.application.handlers.settings as settings
 import bot.application.handlers.start as start
 import bot.application.handlers.stats as stats
+from aiogram import Bot, Dispatcher
+from aiogram.types import BotCommand, BotCommandScopeDefault, BotCommandScopeChat
 from bot.domain.entities.mappings import UserType
 from bot.domain.services.user import UserServiceInterface
 
@@ -62,3 +62,4 @@ def setup_base(dp: Dispatcher):
     dp.include_router(settings.router)
     dp.include_router(stats.router)
     dp.include_router(roles.router)
+    dp.include_router(help.router)

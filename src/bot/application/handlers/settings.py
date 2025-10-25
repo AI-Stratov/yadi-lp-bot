@@ -3,9 +3,6 @@ from datetime import time
 from aiogram import Router, F, types
 from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
-from dishka import FromDishka
-from dishka.integrations.aiogram import inject
-
 from bot.application.widgets.keyboards import (
     build_notification_modes_kb,
     build_notification_settings_kb,
@@ -18,6 +15,8 @@ from bot.domain.entities.mappings import iter_subjects_for_course, NotificationS
 from bot.domain.entities.states import NotificationSettingsStates
 from bot.domain.entities.user import UpdateUserEntity
 from bot.domain.services.user import UserServiceInterface
+from dishka import FromDishka
+from dishka.integrations.aiogram import inject
 
 router = Router(name="notification_settings")
 

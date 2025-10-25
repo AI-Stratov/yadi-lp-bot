@@ -1,7 +1,7 @@
 """Форматтеры для отображения данных в интерфейсе"""
 
-from bot.domain.entities.statistics import StatsSnapshot
 from bot.common.utils.formatting import fmt_int, human_ago
+from bot.domain.entities.statistics import StatsSnapshot
 
 
 class StatisticsFormatter:
@@ -52,4 +52,3 @@ class StatisticsFormatter:
         lines.append(top_disabled)
 
         return "\n".join(lines)
-

@@ -2,16 +2,11 @@
 from aiogram import types
 from aiogram.types import InlineKeyboardButton
 from aiogram.utils.keyboard import InlineKeyboardBuilder
-
+from bot.common.utils.formatting import fmt_time, fmt_int
 from bot.domain.entities.course import Course, get_courses
 from bot.domain.entities.mappings import SUBJECTS, NotificationScheduleMode
 from bot.domain.entities.user import UserEntity
-from bot.common.utils.formatting import fmt_time, fmt_int
 
-
-# ============================================================================
-# Клавиатуры для выбора курса и группы (/set)
-# ============================================================================
 
 def build_courses_kb() -> types.InlineKeyboardMarkup:
     """
@@ -39,10 +34,6 @@ def build_groups_kb(course: Course) -> types.InlineKeyboardMarkup:
     kb.adjust(3)
     return kb.as_markup()
 
-
-# ============================================================================
-# Клавиатуры настроек уведомлений (/settings)
-# ============================================================================
 
 def build_notification_modes_kb(current: NotificationScheduleMode | None) -> types.InlineKeyboardMarkup:
     """
@@ -85,6 +76,7 @@ def build_notification_settings_kb(user: UserEntity) -> types.InlineKeyboardMark
     :param user: сущность пользователя для отображения текущих настроек
     :return: inline-клавиатура с меню настроек
     """
+
     def get_mode_label(u: UserEntity) -> str:
         """Получить метку текущего режима доставки."""
         mode = u.notification_mode
@@ -114,13 +106,16 @@ def build_notification_settings_kb(user: UserEntity) -> types.InlineKeyboardMark
         e = fmt_time(user.delivery_window_end) or "-"
         kb.row(InlineKeyboardButton(text=f"🪟 Окно: {s}–{e}", callback_data="set_window"))
 
-    # Предметы: показываем количество активных (всего по курсу минус исключённые)
+    # Предметы: показываем количество активных (всего по курсу минус исключённые ТОЛЬКО для этого курса)
     subjects_label = "📚 Предметы"
     try:
         if user.user_course:
             from bot.domain.entities.mappings import iter_subjects_for_course
-            total = len([key for key, _ in iter_subjects_for_course(user.user_course)])
-            excluded_cnt = len(user.excluded_disciplines or set())
+            course_keys = [key for key, _ in iter_subjects_for_course(user.user_course)]
+            total = len(course_keys)
+            excluded_all_raw = user.excluded_disciplines or set()
+            excluded_all = {str(k).strip() for k in excluded_all_raw}
+            excluded_cnt = len(set(course_keys) & excluded_all)
             active_cnt = max(total - excluded_cnt, 0)
             subjects_label = f"📚 Предметы ({active_cnt})"
     except Exception:
@@ -194,10 +189,6 @@ def build_subjects_selection_kb(
     return kb.as_markup()
 
 
-# ============================================================================
-# Клавиатуры статистики (/stats)
-# ============================================================================
-
 def build_stats_menu_kb() -> types.InlineKeyboardMarkup:
     """
     Главное меню статистики
@@ -264,10 +255,6 @@ def build_kv_list_kb(
     kb.row(InlineKeyboardButton(text="⬅️ Назад", callback_data=back_cb))
     return kb.as_markup()
 
-
-# ============================================================================
-# Клавиатуры управления ролями (/roles)
-# ============================================================================
 
 def build_roles_menu_kb() -> types.InlineKeyboardMarkup:
     """

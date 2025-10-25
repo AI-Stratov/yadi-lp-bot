@@ -1,19 +1,9 @@
-from bot.domain.entities.user import UpdateUserEntity, CreateUserEntity, UserEntity
-from bot.domain.repositories.user import UserRepositoryInterface
-from bot.domain.services.user import UserServiceInterface
 from bot.domain.entities.mappings import UserType
-from bot.core.config import BotConfig
+from bot.domain.entities.user import UpdateUserEntity, CreateUserEntity, UserEntity
+from bot.domain.services.user import UserServiceInterface
 
 
 class UserService(UserServiceInterface):
-    def __init__(
-        self,
-        user_repository: UserRepositoryInterface,
-        bot_config: BotConfig | None = None,
-    ):
-        self.user_repository = user_repository
-        self._superuser_id = bot_config.SUPERUSER_ID if bot_config else None
-
     async def get_user_by_id(self, user_id: int) -> UserEntity | None:
         return await self.user_repository.get_by_id(user_id)
 

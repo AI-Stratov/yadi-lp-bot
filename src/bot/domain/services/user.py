@@ -1,12 +1,22 @@
 from abc import ABC, abstractmethod
 
+from bot.core.config import BotConfig
 from bot.domain.entities.mappings import UserType
 from bot.domain.entities.user import CreateUserEntity, UpdateUserEntity
 from bot.domain.entities.user import UserEntity
+from bot.domain.repositories.user import UserRepositoryInterface
 
 
 class UserServiceInterface(ABC):
     """Интерфейс сервиса управления пользователями"""
+
+    def __init__(
+        self,
+        user_repository: UserRepositoryInterface,
+        bot_config: BotConfig | None = None,
+    ):
+        self.user_repository = user_repository
+        self._superuser_id = bot_config.SUPERUSER_ID if bot_config else None
 
     @abstractmethod
     async def get_user_by_id(self, user_id: int) -> UserEntity | None:

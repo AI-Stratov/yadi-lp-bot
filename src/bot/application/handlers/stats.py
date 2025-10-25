@@ -1,20 +1,19 @@
 from aiogram import Router, types, F
+from aiogram.exceptions import TelegramBadRequest
 from aiogram.filters import Command
 from aiogram.types import LinkPreviewOptions
-from aiogram.exceptions import TelegramBadRequest
-from dishka import FromDishka
-from dishka.integrations.aiogram import inject
-from redis.asyncio import Redis
-
 from bot.application.services.long_poll import YandexDiskPollingService
-from bot.domain.services.scheduler import SchedulerServiceInterface
 from bot.application.widgets.keyboards import build_stats_menu_kb, build_kv_list_kb
 from bot.common.utils.formatters import StatisticsFormatter
 from bot.common.utils.formatting import parse_dt_raw, fmt_secs, fmt_int, human_ago
 from bot.common.utils.permissions import is_admin
 from bot.domain.entities.user import CreateUserEntity
+from bot.domain.services.scheduler import SchedulerServiceInterface
 from bot.domain.services.statistics import StatisticsServiceInterface
 from bot.domain.services.user import UserServiceInterface
+from dishka import FromDishka
+from dishka.integrations.aiogram import inject
+from redis.asyncio import Redis
 
 router = Router(name="stats")
 

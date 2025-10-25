@@ -6,6 +6,15 @@ from bot.domain.entities.notification import NotificationTask, UserNotification
 
 
 class NotificationRepositoryInterface(ABC):
+    BASE_QUEUE = 'notifications:queue'
+    BASE_USER = 'notifications:user:{user_id}'
+    BASE_SENT = 'notifications:sent:{user_id}'
+    BASE_STATUS = 'notifications:status:{notification_id}'
+
+    def __init__(self, redis, key_prefix: str = ''):
+        self.redis = redis
+        self._prefix = key_prefix.strip().rstrip(':') if key_prefix else ''
+
     @abstractmethod
     async def push_to_queue(self, tasks: list[NotificationTask]) -> None:
         """Добавляет задачи в общую очередь для обработки"""

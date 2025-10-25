@@ -3,9 +3,6 @@ from aiogram.exceptions import TelegramBadRequest
 from aiogram.filters import Command
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 from aiogram.utils.keyboard import InlineKeyboardBuilder
-from dishka import FromDishka
-from dishka.integrations.aiogram import inject
-
 from bot.application.widgets.keyboards import build_roles_menu_kb
 from bot.common.utils.pagination import paginate
 from bot.common.utils.permissions import is_superuser
@@ -14,6 +11,8 @@ from bot.domain.entities import constants as app_consts
 from bot.domain.entities.mappings import UserType
 from bot.domain.entities.user import CreateUserEntity
 from bot.domain.services.user import UserServiceInterface
+from dishka import FromDishka
+from dishka.integrations.aiogram import inject
 
 router = Router(name="roles")
 

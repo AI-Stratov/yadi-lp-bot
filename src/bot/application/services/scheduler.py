@@ -2,7 +2,6 @@ import asyncio
 from datetime import datetime
 
 from aiogram.types import LinkPreviewOptions
-
 from bot.common.logs import logger
 from bot.common.utils.formatting import format_notification_message
 from bot.domain.entities.notification import UserNotification
@@ -56,7 +55,7 @@ class NotificationScheduler(SchedulerServiceInterface):
 
         logger.debug(f"🔍 Проверка уведомлений до {now.isoformat()}")
 
-        async for notification in self.repository.get_due_notifications(now): # NOQA
+        async for notification in self.repository.get_due_notifications(now):  # NOQA
             try:
                 await self._send_notification(notification)
                 if notification.notification_id:

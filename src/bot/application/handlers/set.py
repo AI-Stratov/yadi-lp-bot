@@ -1,12 +1,12 @@
 from aiogram import Router, types, F
 from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
+from bot.application.widgets.keyboards import build_courses_kb, build_groups_kb
 from bot.domain.entities.course import get_course
 from bot.domain.entities.mappings import StudyCourses, StudyGroups
 from bot.domain.entities.states import SettingsStates
 from bot.domain.entities.user import UpdateUserEntity
 from bot.domain.services.user import UserServiceInterface
-from bot.application.widgets.keyboards import build_courses_kb, build_groups_kb
 from dishka import FromDishka
 from dishka.integrations.aiogram import inject
 
